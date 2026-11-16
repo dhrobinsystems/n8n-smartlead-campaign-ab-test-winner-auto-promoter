@@ -1,0 +1,767 @@
+{
+  "_comment": "Synthetic fixture. All IDs, names and figures are fictitious. Shapes follow GET /campaigns/, GET /campaigns/{id}/sequence-analytics and GET /campaigns/{id}/sequences (README \u00a78). Step 2 of campaign 12345 carries variant_distribution_percentage to show split preservation; most accounts do not return it.",
+  "campaigns": [
+    {
+      "id": 12345,
+      "name": "campaign_id_12345 \u00b7 Synthetic Ops Leaders Q4",
+      "status": "ACTIVE",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "parent_campaign_id": null,
+      "client_id": null,
+      "max_leads_per_day": 300,
+      "tags": [
+        {
+          "tag_id": 1,
+          "tag_name": "ab-auto",
+          "tag_color": "#2E7D32"
+        }
+      ]
+    },
+    {
+      "id": 12346,
+      "name": "campaign_id_12346 \u00b7 Synthetic Finance Three-Way Test",
+      "status": "ACTIVE",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "parent_campaign_id": null,
+      "client_id": null,
+      "max_leads_per_day": 300,
+      "tags": [
+        {
+          "tag_id": 1,
+          "tag_name": "ab-auto",
+          "tag_color": "#2E7D32"
+        }
+      ]
+    },
+    {
+      "id": 12347,
+      "name": "campaign_id_12347 \u00b7 Synthetic Early Test",
+      "status": "ACTIVE",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "parent_campaign_id": null,
+      "client_id": null,
+      "max_leads_per_day": 300,
+      "tags": [
+        {
+          "tag_id": 1,
+          "tag_name": "ab-auto",
+          "tag_color": "#2E7D32"
+        }
+      ]
+    },
+    {
+      "id": 12348,
+      "name": "campaign_id_12348 \u00b7 Synthetic High-Bounce Winner",
+      "status": "ACTIVE",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "parent_campaign_id": null,
+      "client_id": null,
+      "max_leads_per_day": 300,
+      "tags": [
+        {
+          "tag_id": 1,
+          "tag_name": "ab-auto",
+          "tag_color": "#2E7D32"
+        }
+      ]
+    },
+    {
+      "id": 12349,
+      "name": "campaign_id_12349 \u00b7 Synthetic Paused Campaign",
+      "status": "PAUSED",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "parent_campaign_id": null,
+      "client_id": null,
+      "max_leads_per_day": 300,
+      "tags": [
+        {
+          "tag_id": 1,
+          "tag_name": "ab-auto",
+          "tag_color": "#2E7D32"
+        }
+      ]
+    },
+    {
+      "id": 12350,
+      "name": "campaign_id_12350 \u00b7 Synthetic Low-Reply Market",
+      "status": "ACTIVE",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "parent_campaign_id": null,
+      "client_id": null,
+      "max_leads_per_day": 300,
+      "tags": [
+        {
+          "tag_id": 1,
+          "tag_name": "ab-auto",
+          "tag_color": "#2E7D32"
+        }
+      ]
+    }
+  ],
+  "sequence_analytics": {
+    "12345": {
+      "ok": true,
+      "data": {
+        "campaign_id": 12345,
+        "sequences": [
+          {
+            "id": 50001,
+            "email_campaign_seq_id": 50001,
+            "seq_number": 1,
+            "seq_type": "EMAIL",
+            "seq_schedule_type": "IMMEDIATE",
+            "subject_line": "Quick question about {{company_name}}",
+            "seq_title": null,
+            "total_stats": {
+              "sent_count": 2380,
+              "reply_count": 65,
+              "bounce_count": 28,
+              "positive_reply_count": 32,
+              "reply_percentage": 2.73
+            },
+            "engagement_level": "medium",
+            "variants": [
+              {
+                "id": 90001,
+                "variant_label": "A",
+                "is_baseline": true,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 1200,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 18,
+                  "reply_percentage": 1.5,
+                  "bounce_count": 14,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 9
+                }
+              },
+              {
+                "id": 90002,
+                "variant_label": "B",
+                "is_baseline": false,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 1180,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 47,
+                  "reply_percentage": 3.98,
+                  "bounce_count": 14,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 23
+                }
+              }
+            ],
+            "linkedin_stats": null,
+            "manual_step_stats": null
+          },
+          {
+            "id": 50002,
+            "email_campaign_seq_id": 50002,
+            "seq_number": 2,
+            "seq_type": "EMAIL",
+            "seq_schedule_type": "IMMEDIATE",
+            "subject_line": null,
+            "seq_title": null,
+            "total_stats": {
+              "sent_count": 1295,
+              "reply_count": 21,
+              "bounce_count": 16,
+              "positive_reply_count": 10,
+              "reply_percentage": 1.62
+            },
+            "engagement_level": "medium",
+            "variants": [
+              {
+                "id": 90003,
+                "variant_label": "A",
+                "is_baseline": true,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 640,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 9,
+                  "reply_percentage": 1.41,
+                  "bounce_count": 8,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 4
+                }
+              },
+              {
+                "id": 90004,
+                "variant_label": "B",
+                "is_baseline": false,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 655,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 12,
+                  "reply_percentage": 1.83,
+                  "bounce_count": 8,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 6
+                }
+              }
+            ],
+            "linkedin_stats": null,
+            "manual_step_stats": null
+          }
+        ]
+      }
+    },
+    "12346": {
+      "ok": true,
+      "data": {
+        "campaign_id": 12346,
+        "sequences": [
+          {
+            "id": 50011,
+            "email_campaign_seq_id": 50011,
+            "seq_number": 1,
+            "seq_type": "EMAIL",
+            "seq_schedule_type": "IMMEDIATE",
+            "subject_line": "{{first_name}}, idea for {{company_name}}",
+            "seq_title": null,
+            "total_stats": {
+              "sent_count": 2650,
+              "reply_count": 64,
+              "bounce_count": 32,
+              "positive_reply_count": 31,
+              "reply_percentage": 2.42
+            },
+            "engagement_level": "medium",
+            "variants": [
+              {
+                "id": 90011,
+                "variant_label": "A",
+                "is_baseline": true,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 900,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 27,
+                  "reply_percentage": 3.0,
+                  "bounce_count": 11,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 13
+                }
+              },
+              {
+                "id": 90012,
+                "variant_label": "B",
+                "is_baseline": false,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 880,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 8,
+                  "reply_percentage": 0.91,
+                  "bounce_count": 11,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 4
+                }
+              },
+              {
+                "id": 90013,
+                "variant_label": "C",
+                "is_baseline": false,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 870,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 29,
+                  "reply_percentage": 3.33,
+                  "bounce_count": 10,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 14
+                }
+              }
+            ],
+            "linkedin_stats": null,
+            "manual_step_stats": null
+          }
+        ]
+      }
+    },
+    "12347": {
+      "ok": true,
+      "data": {
+        "campaign_id": 12347,
+        "sequences": [
+          {
+            "id": 50021,
+            "email_campaign_seq_id": 50021,
+            "seq_number": 1,
+            "seq_type": "EMAIL",
+            "seq_schedule_type": "IMMEDIATE",
+            "subject_line": "Worth a look?",
+            "seq_title": null,
+            "total_stats": {
+              "sent_count": 290,
+              "reply_count": 9,
+              "bounce_count": 4,
+              "positive_reply_count": 4,
+              "reply_percentage": 3.1
+            },
+            "engagement_level": "medium",
+            "variants": [
+              {
+                "id": 90021,
+                "variant_label": "A",
+                "is_baseline": true,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 150,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 2,
+                  "reply_percentage": 1.33,
+                  "bounce_count": 2,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 1
+                }
+              },
+              {
+                "id": 90022,
+                "variant_label": "B",
+                "is_baseline": false,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 140,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 7,
+                  "reply_percentage": 5.0,
+                  "bounce_count": 2,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 3
+                }
+              }
+            ],
+            "linkedin_stats": null,
+            "manual_step_stats": null
+          }
+        ]
+      }
+    },
+    "12348": {
+      "ok": true,
+      "data": {
+        "campaign_id": 12348,
+        "sequences": [
+          {
+            "id": 50031,
+            "email_campaign_seq_id": 50031,
+            "seq_number": 1,
+            "seq_type": "EMAIL",
+            "seq_schedule_type": "IMMEDIATE",
+            "subject_line": "Saw your team is hiring",
+            "seq_title": null,
+            "total_stats": {
+              "sent_count": 2010,
+              "reply_count": 53,
+              "bounce_count": 87,
+              "positive_reply_count": 26,
+              "reply_percentage": 2.64
+            },
+            "engagement_level": "medium",
+            "variants": [
+              {
+                "id": 90031,
+                "variant_label": "A",
+                "is_baseline": true,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 1000,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 12,
+                  "reply_percentage": 1.2,
+                  "bounce_count": 12,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 6
+                }
+              },
+              {
+                "id": 90032,
+                "variant_label": "B",
+                "is_baseline": false,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 1010,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 41,
+                  "reply_percentage": 4.06,
+                  "bounce_count": 75,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 7.4,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 20
+                }
+              }
+            ],
+            "linkedin_stats": null,
+            "manual_step_stats": null
+          }
+        ]
+      }
+    },
+    "12350": {
+      "ok": true,
+      "data": {
+        "campaign_id": 12350,
+        "sequences": [
+          {
+            "id": 50051,
+            "email_campaign_seq_id": 50051,
+            "seq_number": 1,
+            "seq_type": "EMAIL",
+            "seq_schedule_type": "IMMEDIATE",
+            "subject_line": "Short note",
+            "seq_title": null,
+            "total_stats": {
+              "sent_count": 4000,
+              "reply_count": 15,
+              "bounce_count": 48,
+              "positive_reply_count": 7,
+              "reply_percentage": 0.38
+            },
+            "engagement_level": "medium",
+            "variants": [
+              {
+                "id": 90051,
+                "variant_label": "A",
+                "is_baseline": true,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 2000,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 1,
+                  "reply_percentage": 0.05,
+                  "bounce_count": 24,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 0
+                }
+              },
+              {
+                "id": 90052,
+                "variant_label": "B",
+                "is_baseline": false,
+                "created_at": "2026-10-01T09:00:00.000Z",
+                "change_description": null,
+                "stats": {
+                  "sent_count": 2000,
+                  "open_count": 0,
+                  "open_percentage": 0,
+                  "click_count": 0,
+                  "click_percentage": 0,
+                  "reply_count": 14,
+                  "reply_percentage": 0.7,
+                  "bounce_count": 24,
+                  "sender_bounce_count": 0,
+                  "bounce_percentage": 1.2,
+                  "unsubscribed_count": 1,
+                  "positive_reply_count": 7
+                }
+              }
+            ],
+            "linkedin_stats": null,
+            "manual_step_stats": null
+          }
+        ]
+      }
+    }
+  },
+  "sequences": {
+    "12345": {
+      "success": true,
+      "data": [
+        {
+          "id": 50001,
+          "created_at": "2026-10-01T09:00:00Z",
+          "updated_at": "2026-10-01T09:00:00Z",
+          "email_campaign_id": 12345,
+          "seq_number": 1,
+          "subject": "Quick question about {{company_name}}",
+          "follow_up_subject": null,
+          "email_body": "<p>Synthetic step 1 body for campaign 12345.</p>",
+          "seq_delay_details": {
+            "delayInDays": 0
+          },
+          "sequence_variants": [
+            {
+              "id": 90001,
+              "variant_name": "Variant A",
+              "subject": "Quick question about {{company_name}}",
+              "email_body": "<p>Synthetic step 1 variant A body.</p>"
+            },
+            {
+              "id": 90002,
+              "variant_name": "Variant B",
+              "subject": "Quick question about {{company_name}}",
+              "email_body": "<p>Synthetic step 1 variant B body.</p>"
+            }
+          ]
+        },
+        {
+          "id": 50002,
+          "created_at": "2026-10-01T09:00:00Z",
+          "updated_at": "2026-10-01T09:00:00Z",
+          "email_campaign_id": 12345,
+          "seq_number": 2,
+          "subject": "",
+          "follow_up_subject": null,
+          "email_body": "<p>Synthetic step 2 body for campaign 12345.</p>",
+          "seq_delay_details": {
+            "delayInDays": 3
+          },
+          "sequence_variants": [
+            {
+              "id": 90003,
+              "variant_name": "Variant A",
+              "subject": "",
+              "email_body": "<p>Synthetic step 2 variant A body.</p>",
+              "variant_distribution_percentage": 50
+            },
+            {
+              "id": 90004,
+              "variant_name": "Variant B",
+              "subject": "",
+              "email_body": "<p>Synthetic step 2 variant B body.</p>",
+              "variant_distribution_percentage": 50
+            }
+          ]
+        },
+        {
+          "id": 50003,
+          "created_at": "2026-10-01T09:00:00Z",
+          "updated_at": "2026-10-01T09:00:00Z",
+          "email_campaign_id": 12345,
+          "seq_number": 3,
+          "subject": "",
+          "follow_up_subject": null,
+          "email_body": "<p>Synthetic step 3 body for campaign 12345.</p>",
+          "seq_delay_details": {
+            "delayInDays": 5
+          },
+          "sequence_variants": []
+        }
+      ]
+    },
+    "12346": {
+      "success": true,
+      "data": [
+        {
+          "id": 50011,
+          "created_at": "2026-10-01T09:00:00Z",
+          "updated_at": "2026-10-01T09:00:00Z",
+          "email_campaign_id": 12346,
+          "seq_number": 1,
+          "subject": "{{first_name}}, idea for {{company_name}}",
+          "follow_up_subject": null,
+          "email_body": "<p>Synthetic step 1 body for campaign 12346.</p>",
+          "seq_delay_details": {
+            "delayInDays": 0
+          },
+          "sequence_variants": [
+            {
+              "id": 90011,
+              "variant_name": "Variant A",
+              "subject": "{{first_name}}, idea for {{company_name}}",
+              "email_body": "<p>Synthetic step 1 variant A body.</p>"
+            },
+            {
+              "id": 90012,
+              "variant_name": "Variant B",
+              "subject": "{{first_name}}, idea for {{company_name}}",
+              "email_body": "<p>Synthetic step 1 variant B body.</p>"
+            },
+            {
+              "id": 90013,
+              "variant_name": "Variant C",
+              "subject": "{{first_name}}, idea for {{company_name}}",
+              "email_body": "<p>Synthetic step 1 variant C body.</p>"
+            }
+          ]
+        },
+        {
+          "id": 50012,
+          "created_at": "2026-10-01T09:00:00Z",
+          "updated_at": "2026-10-01T09:00:00Z",
+          "email_campaign_id": 12346,
+          "seq_number": 2,
+          "subject": "",
+          "follow_up_subject": null,
+          "email_body": "<p>Synthetic step 2 body for campaign 12346.</p>",
+          "seq_delay_details": {
+            "delayInDays": 4
+          },
+          "sequence_variants": []
+        }
+      ]
+    },
+    "12347": {
+      "success": true,
+      "data": [
+        {
+          "id": 50021,
+          "created_at": "2026-10-01T09:00:00Z",
+          "updated_at": "2026-10-01T09:00:00Z",
+          "email_campaign_id": 12347,
+          "seq_number": 1,
+          "subject": "Worth a look?",
+          "follow_up_subject": null,
+          "email_body": "<p>Synthetic step 1 body for campaign 12347.</p>",
+          "seq_delay_details": {
+            "delayInDays": 0
+          },
+          "sequence_variants": [
+            {
+              "id": 90021,
+              "variant_name": "Variant A",
+              "subject": "Worth a look?",
+              "email_body": "<p>Synthetic step 1 variant A body.</p>"
+            },
+            {
+              "id": 90022,
+              "variant_name": "Variant B",
+              "subject": "Worth a look?",
+              "email_body": "<p>Synthetic step 1 variant B body.</p>"
+            }
+          ]
+        }
+      ]
+    },
+    "12348": {
+      "success": true,
+      "data": [
+        {
+          "id": 50031,
+          "created_at": "2026-10-01T09:00:00Z",
+          "updated_at": "2026-10-01T09:00:00Z",
+          "email_campaign_id": 12348,
+          "seq_number": 1,
+          "subject": "Saw your team is hiring",
+          "follow_up_subject": null,
+          "email_body": "<p>Synthetic step 1 body for campaign 12348.</p>",
+          "seq_delay_details": {
+            "delayInDays": 0
+          },
+          "sequence_variants": [
+            {
+              "id": 90031,
+              "variant_name": "Variant A",
+              "subject": "Saw your team is hiring",
+              "email_body": "<p>Synthetic step 1 variant A body.</p>"
+            },
+            {
+              "id": 90032,
+              "variant_name": "Variant B",
+              "subject": "Saw your team is hiring",
+              "email_body": "<p>Synthetic step 1 variant B body.</p>"
+            }
+          ]
+        }
+      ]
+    },
+    "12350": {
+      "success": true,
+      "data": [
+        {
+          "id": 50051,
+          "created_at": "2026-10-01T09:00:00Z",
+          "updated_at": "2026-10-01T09:00:00Z",
+          "email_campaign_id": 12350,
+          "seq_number": 1,
+          "subject": "Short note",
+          "follow_up_subject": null,
+          "email_body": "<p>Synthetic step 1 body for campaign 12350.</p>",
+          "seq_delay_details": {
+            "delayInDays": 0
+          },
+          "sequence_variants": [
+            {
+              "id": 90051,
+              "variant_name": "Variant A",
+              "subject": "Short note",
+              "email_body": "<p>Synthetic step 1 variant A body.</p>"
+            },
+            {
+              "id": 90052,
+              "variant_name": "Variant B",
+              "subject": "Short note",
+              "email_body": "<p>Synthetic step 1 variant B body.</p>"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
