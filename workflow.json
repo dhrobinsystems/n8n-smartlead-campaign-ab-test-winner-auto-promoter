@@ -1,0 +1,2245 @@
+{
+  "name": "Smartlead Campaign A/B Test Winner Auto-Promoter (dhRobin Systems)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## n8n-smartlead-campaign-ab-test-winner-auto-promoter\n**dhRobin Systems** · Daily: ACTIVE Smartlead campaigns → per-variant sequence analytics over `STATS_WINDOW_DAYS` → two-proportion z-test vs. the leader (Bonferroni) + sample, lift, rate, bounce and cooldown guardrails → pause losers / promote winner via MANUAL_PERCENTAGE split → Slack / webhook → audit.\n\n**Safe by default.** With no environment variables set:\n- `SANDBOX_MODE=true`: synthetic campaigns. **Zero Smartlead calls.**\n- `DRY_RUN=true`: decisions and payloads are built, nothing changes.\n- `PROMOTE_WINNERS=false`: campaign changes need an explicit opt-in.\n\nSmartlead rejects sequence edits on ACTIVE campaigns, so a change runs **pause → save split → resume** (resume always runs).",
+        "height": 420,
+        "width": 700,
+        "color": 5
+      },
+      "id": "3ec5ae3d-c44f-5ca5-a56b-5d4308ed60d9",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -500
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Decision rule\nLoser = leader better with one-sided p < α/(k−1) **and** relative lift ≥ `MIN_RELATIVE_LIFT`.\nLeader must have ≥ `MIN_WINNER_EVENTS`, rate ≥ `MIN_WINNER_REPLY_RATE_PCT`, bounce ≤ `MAX_BOUNCE_RATE_PCT`.\nEvery variant needs ≥ `MIN_SAMPLE_SIZE` sends. Daily re-testing raises false positives: keep α small.",
+        "height": 230,
+        "width": 440,
+        "color": 6
+      },
+      "id": "3a351c52-f98b-5044-8fbc-67621be06016",
+      "name": "Stats Notice",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Pinned synthetic payloads\nPinned: campaign list, sequence analytics + sequences (2 campaigns), pause / save / resume (2 campaigns), Slack, webhook.\nPins apply to **manual executions only**; scheduled runs ignore them. Unpin a node before a manual live test.",
+        "height": 200,
+        "width": 420,
+        "color": 3
+      },
+      "id": "5647b95b-aff6-5cd0-b782-0ba247745323",
+      "name": "Pinned Data Notice",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "15 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "5eb45e6d-2629-5431-a5fc-efdec048aa7a",
+      "name": "Daily A/B Evaluation",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        100
+      ],
+      "notes": "Daily 07:15 UTC. Hourly is possible but increases false positives.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "487f3e5a-e470-5e69-8a32-c1a5e9fffb0c",
+      "name": "Manual Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "40e69843-859c-5654-a126-ee028373e5ac",
+              "name": "config.sandboxMode",
+              "value": "={{ String($env.SANDBOX_MODE ?? 'true').trim().toLowerCase() !== 'false' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "cfae9842-2d4a-59ce-b95c-ddad633ce487",
+              "name": "config.dryRun",
+              "value": "={{ String($env.DRY_RUN ?? 'true').trim().toLowerCase() !== 'false' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "3434ca01-d53b-5571-8e67-3bf2ed53e22c",
+              "name": "config.promoteWinners",
+              "value": "={{ !(String($env.SANDBOX_MODE ?? 'true').trim().toLowerCase() !== 'false') && !(String($env.DRY_RUN ?? 'true').trim().toLowerCase() !== 'false') && String($env.PROMOTE_WINNERS ?? 'false').trim().toLowerCase() === 'true' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c8de2404-6026-5b6c-92c3-1ddd9fe0e47c",
+              "name": "config.notifyChannels",
+              "value": "={{ String($env.NOTIFY_CHANNELS ?? 'slack').toLowerCase().split(',').map(x => x.trim()).filter(x => ['slack', 'webhook'].includes(x)) }}",
+              "type": "array"
+            },
+            {
+              "id": "ef5419eb-1a32-55cb-b0ba-2c27a8dd2500",
+              "name": "config.slackEnabled",
+              "value": "={{ !(String($env.SANDBOX_MODE ?? 'true').trim().toLowerCase() !== 'false') && String($env.NOTIFY_CHANNELS ?? 'slack').toLowerCase().split(',').map(x => x.trim()).filter(x => ['slack', 'webhook'].includes(x)).includes('slack') && Boolean(String($env.SLACK_WEBHOOK_URL ?? '').trim()) }}",
+              "type": "boolean"
+            },
+            {
+              "id": "95ae9440-e4e9-5db7-b46f-c66f30030e55",
+              "name": "config.webhookEnabled",
+              "value": "={{ !(String($env.SANDBOX_MODE ?? 'true').trim().toLowerCase() !== 'false') && String($env.NOTIFY_CHANNELS ?? 'slack').toLowerCase().split(',').map(x => x.trim()).filter(x => ['slack', 'webhook'].includes(x)).includes('webhook') && Boolean(String($env.ALERT_WEBHOOK_URL ?? '').trim()) }}",
+              "type": "boolean"
+            },
+            {
+              "id": "5ce78cf7-e5dc-5bc0-8052-ea269254ca95",
+              "name": "config.notifyOnNoChange",
+              "value": "={{ String($env.NOTIFY_ON_NO_CHANGE ?? 'false').trim().toLowerCase() === 'true' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "4e634c9d-f724-5d7d-a542-7f2bfa1a5456",
+              "name": "config.testMetric",
+              "value": "={{ ['reply', 'positive_reply'].includes(String($env.TEST_METRIC ?? 'reply').trim().toLowerCase()) ? String($env.TEST_METRIC ?? 'reply').trim().toLowerCase() : 'reply' }}",
+              "type": "string"
+            },
+            {
+              "id": "ff09e5a6-15c9-57e5-9119-ec3094a9b78a",
+              "name": "config.minSampleSize",
+              "value": "={{ Math.min(1000000, Math.max(30, Number.isFinite(parseFloat($env.MIN_SAMPLE_SIZE)) ? Math.round(parseFloat($env.MIN_SAMPLE_SIZE)) : 200)) }}",
+              "type": "number"
+            },
+            {
+              "id": "ad554e29-c369-5db5-be30-e3f90921c0d8",
+              "name": "config.alpha",
+              "value": "={{ Math.min(0.2, Math.max(0.0001, Number.isFinite(parseFloat($env.SIGNIFICANCE_ALPHA)) ? parseFloat($env.SIGNIFICANCE_ALPHA) : 0.01)) }}",
+              "type": "number"
+            },
+            {
+              "id": "4cc94953-eef1-572d-be18-53e015f6ff4e",
+              "name": "config.minRelativeLift",
+              "value": "={{ Math.min(10, Math.max(0, Number.isFinite(parseFloat($env.MIN_RELATIVE_LIFT)) ? parseFloat($env.MIN_RELATIVE_LIFT) : 0.2)) }}",
+              "type": "number"
+            },
+            {
+              "id": "4887b416-d201-51f6-896e-c30b9269ec0c",
+              "name": "config.minWinnerRatePct",
+              "value": "={{ Math.min(100, Math.max(0, Number.isFinite(parseFloat($env.MIN_WINNER_REPLY_RATE_PCT)) ? parseFloat($env.MIN_WINNER_REPLY_RATE_PCT) : 1)) }}",
+              "type": "number"
+            },
+            {
+              "id": "6bd8d40f-5dd7-5fa2-bf66-3048881907f4",
+              "name": "config.minWinnerEvents",
+              "value": "={{ Math.min(100000, Math.max(1, Number.isFinite(parseFloat($env.MIN_WINNER_EVENTS)) ? Math.round(parseFloat($env.MIN_WINNER_EVENTS)) : 10)) }}",
+              "type": "number"
+            },
+            {
+              "id": "94b1075f-07e1-548e-b6d3-775eb20ae679",
+              "name": "config.maxBounceRatePct",
+              "value": "={{ Math.min(100, Math.max(0, Number.isFinite(parseFloat($env.MAX_BOUNCE_RATE_PCT)) ? parseFloat($env.MAX_BOUNCE_RATE_PCT) : 5)) }}",
+              "type": "number"
+            },
+            {
+              "id": "19762381-0db9-50be-88a5-fe0558634bc5",
+              "name": "config.loserFloorPercent",
+              "value": "={{ [0, 10, 20].includes(Number($env.LOSER_FLOOR_PERCENT)) ? Number($env.LOSER_FLOOR_PERCENT) : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "feca1628-8345-5bdc-b3ce-503bf1e555ae",
+              "name": "config.allowEqualSplitAssumption",
+              "value": "={{ String($env.ALLOW_EQUAL_SPLIT_ASSUMPTION ?? 'false').trim().toLowerCase() === 'true' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "b4328189-3767-52f4-95c9-8715afb49f85",
+              "name": "config.cooldownDays",
+              "value": "={{ Math.min(90, Math.max(0, Number.isFinite(parseFloat($env.COOLDOWN_DAYS)) ? Math.round(parseFloat($env.COOLDOWN_DAYS)) : 7)) }}",
+              "type": "number"
+            },
+            {
+              "id": "0d07151b-2617-5e07-80be-9d9439c77426",
+              "name": "config.windowDays",
+              "value": "={{ Math.min(180, Math.max(1, Number.isFinite(parseFloat($env.STATS_WINDOW_DAYS)) ? Math.round(parseFloat($env.STATS_WINDOW_DAYS)) : 30)) }}",
+              "type": "number"
+            },
+            {
+              "id": "f444cc99-1149-58d7-9ff3-b825c7b1a8c8",
+              "name": "config.windowStart",
+              "value": "={{ new Date(Date.now() - Math.min(180, Math.max(1, Number.isFinite(parseFloat($env.STATS_WINDOW_DAYS)) ? Math.round(parseFloat($env.STATS_WINDOW_DAYS)) : 30)) * 86400000).toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "aa1c6b93-e8be-58e1-90ca-5e5622577443",
+              "name": "config.windowEnd",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "aa29c46b-46b6-5576-bac9-6d46e2763538",
+              "name": "config.timeZone",
+              "value": "={{ String($env.STATS_TIME_ZONE ?? 'UTC').trim() || 'UTC' }}",
+              "type": "string"
+            },
+            {
+              "id": "6358291d-b699-55e3-a429-620da16ad66a",
+              "name": "config.campaignIds",
+              "value": "={{ String($env.CAMPAIGN_IDS ?? '').split(',').map(x => x.trim()).filter(x => /^\\d+$/.test(x)) }}",
+              "type": "array"
+            },
+            {
+              "id": "452e3079-3433-58bd-9735-e7481dbd7d6f",
+              "name": "config.campaignTag",
+              "value": "={{ String($env.CAMPAIGN_TAG ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "7e48d05f-af28-5a88-93fb-fd00670edeb3",
+              "name": "config.maxCampaigns",
+              "value": "={{ Math.min(100, Math.max(1, Number.isFinite(parseFloat($env.MAX_CAMPAIGNS_PER_RUN)) ? Math.round(parseFloat($env.MAX_CAMPAIGNS_PER_RUN)) : 25)) }}",
+              "type": "number"
+            },
+            {
+              "id": "a91662a5-7ac7-5983-960c-101ab40180ac",
+              "name": "config.smartleadBaseUrl",
+              "value": "={{ String($env.SMARTLEAD_API_BASE_URL ?? 'https://server.smartlead.ai/api/v1').trim().replace(/\\/+$/, '') || 'https://server.smartlead.ai/api/v1' }}",
+              "type": "string"
+            },
+            {
+              "id": "109042de-0282-5d6c-8b0e-68f71f69f4e0",
+              "name": "config.runId",
+              "value": "={{ $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "50001eae-6a7a-58d1-9d37-604232447a24",
+              "name": "config.executionMode",
+              "value": "={{ $execution.mode }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "01385b02-fd57-5f5b-903b-c05c85360e0d",
+      "name": "Config & Safety Gate",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -340,
+        200
+      ],
+      "notes": "Typed, non-secret configuration under config.*. Channel flags record only whether a secret is set.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "d069ca59-b5f0-5b33-8f2e-b90d8e8c0b7d",
+              "leftValue": "={{ $('Config & Safety Gate').first().json.config.sandboxMode }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c29fdd50-e97e-5713-b6b8-924a81bbaa45",
+      "name": "Sandbox Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Mock Smartlead Data (SANDBOX_MODE=true)\n// sample-payloads/campaign-stats.json, run through the same campaign selection\n// rules as the live path. No Smartlead request is made.\n// ─────────────────────────────────────────────────────────────────────────────\nconst cfg = $('Config & Safety Gate').first().json.config;\nconst FIXTURE = {\n  \"_comment\": \"Synthetic fixture. All IDs, names and figures are fictitious. Shapes follow GET /campaigns/, GET /campaigns/{id}/sequence-analytics and GET /campaigns/{id}/sequences (README \\u00a78). Step 2 of campaign 12345 carries variant_distribution_percentage to show split preservation; most accounts do not return it.\",\n  \"campaigns\": [\n    {\n      \"id\": 12345,\n      \"name\": \"campaign_id_12345 \\u00b7 Synthetic Ops Leaders Q4\",\n      \"status\": \"ACTIVE\",\n      \"created_at\": \"2026-10-01T09:00:00.000Z\",\n      \"parent_campaign_id\": null,\n      \"client_id\": null,\n      \"max_leads_per_day\": 300,\n      \"tags\": [\n        {\n          \"tag_id\": 1,\n          \"tag_name\": \"ab-auto\",\n          \"tag_color\": \"#2E7D32\"\n        }\n      ]\n    },\n    {\n      \"id\": 12346,\n      \"name\": \"campaign_id_12346 \\u00b7 Synthetic Finance Three-Way Test\",\n      \"status\": \"ACTIVE\",\n      \"created_at\": \"2026-10-01T09:00:00.000Z\",\n      \"parent_campaign_id\": null,\n      \"client_id\": null,\n      \"max_leads_per_day\": 300,\n      \"tags\": [\n        {\n          \"tag_id\": 1,\n          \"tag_name\": \"ab-auto\",\n          \"tag_color\": \"#2E7D32\"\n        }\n      ]\n    },\n    {\n      \"id\": 12347,\n      \"name\": \"campaign_id_12347 \\u00b7 Synthetic Early Test\",\n      \"status\": \"ACTIVE\",\n      \"created_at\": \"2026-10-01T09:00:00.000Z\",\n      \"parent_campaign_id\": null,\n      \"client_id\": null,\n      \"max_leads_per_day\": 300,\n      \"tags\": [\n        {\n          \"tag_id\": 1,\n          \"tag_name\": \"ab-auto\",\n          \"tag_color\": \"#2E7D32\"\n        }\n      ]\n    },\n    {\n      \"id\": 12348,\n      \"name\": \"campaign_id_12348 \\u00b7 Synthetic High-Bounce Winner\",\n      \"status\": \"ACTIVE\",\n      \"created_at\": \"2026-10-01T09:00:00.000Z\",\n      \"parent_campaign_id\": null,\n      \"client_id\": null,\n      \"max_leads_per_day\": 300,\n      \"tags\": [\n        {\n          \"tag_id\": 1,\n          \"tag_name\": \"ab-auto\",\n          \"tag_color\": \"#2E7D32\"\n        }\n      ]\n    },\n    {\n      \"id\": 12349,\n      \"name\": \"campaign_id_12349 \\u00b7 Synthetic Paused Campaign\",\n      \"status\": \"PAUSED\",\n      \"created_at\": \"2026-10-01T09:00:00.000Z\",\n      \"parent_campaign_id\": null,\n      \"client_id\": null,\n      \"max_leads_per_day\": 300,\n      \"tags\": [\n        {\n          \"tag_id\": 1,\n          \"tag_name\": \"ab-auto\",\n          \"tag_color\": \"#2E7D32\"\n        }\n      ]\n    },\n    {\n      \"id\": 12350,\n      \"name\": \"campaign_id_12350 \\u00b7 Synthetic Low-Reply Market\",\n      \"status\": \"ACTIVE\",\n      \"created_at\": \"2026-10-01T09:00:00.000Z\",\n      \"parent_campaign_id\": null,\n      \"client_id\": null,\n      \"max_leads_per_day\": 300,\n      \"tags\": [\n        {\n          \"tag_id\": 1,\n          \"tag_name\": \"ab-auto\",\n          \"tag_color\": \"#2E7D32\"\n        }\n      ]\n    }\n  ],\n  \"sequence_analytics\": {\n    \"12345\": {\n      \"ok\": true,\n      \"data\": {\n        \"campaign_id\": 12345,\n        \"sequences\": [\n          {\n            \"id\": 50001,\n            \"email_campaign_seq_id\": 50001,\n            \"seq_number\": 1,\n            \"seq_type\": \"EMAIL\",\n            \"seq_schedule_type\": \"IMMEDIATE\",\n            \"subject_line\": \"Quick question about {{company_name}}\",\n            \"seq_title\": null,\n            \"total_stats\": {\n              \"sent_count\": 2380,\n              \"reply_count\": 65,\n              \"bounce_count\": 28,\n              \"positive_reply_count\": 32,\n              \"reply_percentage\": 2.73\n            },\n            \"engagement_level\": \"medium\",\n            \"variants\": [\n              {\n                \"id\": 90001,\n                \"variant_label\": \"A\",\n                \"is_baseline\": true,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 1200,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 18,\n                  \"reply_percentage\": 1.5,\n                  \"bounce_count\": 14,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 9\n                }\n              },\n              {\n                \"id\": 90002,\n                \"variant_label\": \"B\",\n                \"is_baseline\": false,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 1180,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 47,\n                  \"reply_percentage\": 3.98,\n                  \"bounce_count\": 14,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 23\n                }\n              }\n            ],\n            \"linkedin_stats\": null,\n            \"manual_step_stats\": null\n          },\n          {\n            \"id\": 50002,\n            \"email_campaign_seq_id\": 50002,\n            \"seq_number\": 2,\n            \"seq_type\": \"EMAIL\",\n            \"seq_schedule_type\": \"IMMEDIATE\",\n            \"subject_line\": null,\n            \"seq_title\": null,\n            \"total_stats\": {\n              \"sent_count\": 1295,\n              \"reply_count\": 21,\n              \"bounce_count\": 16,\n              \"positive_reply_count\": 10,\n              \"reply_percentage\": 1.62\n            },\n            \"engagement_level\": \"medium\",\n            \"variants\": [\n              {\n                \"id\": 90003,\n                \"variant_label\": \"A\",\n                \"is_baseline\": true,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 640,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 9,\n                  \"reply_percentage\": 1.41,\n                  \"bounce_count\": 8,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 4\n                }\n              },\n              {\n                \"id\": 90004,\n                \"variant_label\": \"B\",\n                \"is_baseline\": false,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 655,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 12,\n                  \"reply_percentage\": 1.83,\n                  \"bounce_count\": 8,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 6\n                }\n              }\n            ],\n            \"linkedin_stats\": null,\n            \"manual_step_stats\": null\n          }\n        ]\n      }\n    },\n    \"12346\": {\n      \"ok\": true,\n      \"data\": {\n        \"campaign_id\": 12346,\n        \"sequences\": [\n          {\n            \"id\": 50011,\n            \"email_campaign_seq_id\": 50011,\n            \"seq_number\": 1,\n            \"seq_type\": \"EMAIL\",\n            \"seq_schedule_type\": \"IMMEDIATE\",\n            \"subject_line\": \"{{first_name}}, idea for {{company_name}}\",\n            \"seq_title\": null,\n            \"total_stats\": {\n              \"sent_count\": 2650,\n              \"reply_count\": 64,\n              \"bounce_count\": 32,\n              \"positive_reply_count\": 31,\n              \"reply_percentage\": 2.42\n            },\n            \"engagement_level\": \"medium\",\n            \"variants\": [\n              {\n                \"id\": 90011,\n                \"variant_label\": \"A\",\n                \"is_baseline\": true,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 900,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 27,\n                  \"reply_percentage\": 3.0,\n                  \"bounce_count\": 11,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 13\n                }\n              },\n              {\n                \"id\": 90012,\n                \"variant_label\": \"B\",\n                \"is_baseline\": false,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 880,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 8,\n                  \"reply_percentage\": 0.91,\n                  \"bounce_count\": 11,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 4\n                }\n              },\n              {\n                \"id\": 90013,\n                \"variant_label\": \"C\",\n                \"is_baseline\": false,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 870,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 29,\n                  \"reply_percentage\": 3.33,\n                  \"bounce_count\": 10,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 14\n                }\n              }\n            ],\n            \"linkedin_stats\": null,\n            \"manual_step_stats\": null\n          }\n        ]\n      }\n    },\n    \"12347\": {\n      \"ok\": true,\n      \"data\": {\n        \"campaign_id\": 12347,\n        \"sequences\": [\n          {\n            \"id\": 50021,\n            \"email_campaign_seq_id\": 50021,\n            \"seq_number\": 1,\n            \"seq_type\": \"EMAIL\",\n            \"seq_schedule_type\": \"IMMEDIATE\",\n            \"subject_line\": \"Worth a look?\",\n            \"seq_title\": null,\n            \"total_stats\": {\n              \"sent_count\": 290,\n              \"reply_count\": 9,\n              \"bounce_count\": 4,\n              \"positive_reply_count\": 4,\n              \"reply_percentage\": 3.1\n            },\n            \"engagement_level\": \"medium\",\n            \"variants\": [\n              {\n                \"id\": 90021,\n                \"variant_label\": \"A\",\n                \"is_baseline\": true,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 150,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 2,\n                  \"reply_percentage\": 1.33,\n                  \"bounce_count\": 2,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 1\n                }\n              },\n              {\n                \"id\": 90022,\n                \"variant_label\": \"B\",\n                \"is_baseline\": false,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 140,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 7,\n                  \"reply_percentage\": 5.0,\n                  \"bounce_count\": 2,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 3\n                }\n              }\n            ],\n            \"linkedin_stats\": null,\n            \"manual_step_stats\": null\n          }\n        ]\n      }\n    },\n    \"12348\": {\n      \"ok\": true,\n      \"data\": {\n        \"campaign_id\": 12348,\n        \"sequences\": [\n          {\n            \"id\": 50031,\n            \"email_campaign_seq_id\": 50031,\n            \"seq_number\": 1,\n            \"seq_type\": \"EMAIL\",\n            \"seq_schedule_type\": \"IMMEDIATE\",\n            \"subject_line\": \"Saw your team is hiring\",\n            \"seq_title\": null,\n            \"total_stats\": {\n              \"sent_count\": 2010,\n              \"reply_count\": 53,\n              \"bounce_count\": 87,\n              \"positive_reply_count\": 26,\n              \"reply_percentage\": 2.64\n            },\n            \"engagement_level\": \"medium\",\n            \"variants\": [\n              {\n                \"id\": 90031,\n                \"variant_label\": \"A\",\n                \"is_baseline\": true,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 1000,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 12,\n                  \"reply_percentage\": 1.2,\n                  \"bounce_count\": 12,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 6\n                }\n              },\n              {\n                \"id\": 90032,\n                \"variant_label\": \"B\",\n                \"is_baseline\": false,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 1010,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 41,\n                  \"reply_percentage\": 4.06,\n                  \"bounce_count\": 75,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 7.4,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 20\n                }\n              }\n            ],\n            \"linkedin_stats\": null,\n            \"manual_step_stats\": null\n          }\n        ]\n      }\n    },\n    \"12350\": {\n      \"ok\": true,\n      \"data\": {\n        \"campaign_id\": 12350,\n        \"sequences\": [\n          {\n            \"id\": 50051,\n            \"email_campaign_seq_id\": 50051,\n            \"seq_number\": 1,\n            \"seq_type\": \"EMAIL\",\n            \"seq_schedule_type\": \"IMMEDIATE\",\n            \"subject_line\": \"Short note\",\n            \"seq_title\": null,\n            \"total_stats\": {\n              \"sent_count\": 4000,\n              \"reply_count\": 15,\n              \"bounce_count\": 48,\n              \"positive_reply_count\": 7,\n              \"reply_percentage\": 0.38\n            },\n            \"engagement_level\": \"medium\",\n            \"variants\": [\n              {\n                \"id\": 90051,\n                \"variant_label\": \"A\",\n                \"is_baseline\": true,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 2000,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 1,\n                  \"reply_percentage\": 0.05,\n                  \"bounce_count\": 24,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 0\n                }\n              },\n              {\n                \"id\": 90052,\n                \"variant_label\": \"B\",\n                \"is_baseline\": false,\n                \"created_at\": \"2026-10-01T09:00:00.000Z\",\n                \"change_description\": null,\n                \"stats\": {\n                  \"sent_count\": 2000,\n                  \"open_count\": 0,\n                  \"open_percentage\": 0,\n                  \"click_count\": 0,\n                  \"click_percentage\": 0,\n                  \"reply_count\": 14,\n                  \"reply_percentage\": 0.7,\n                  \"bounce_count\": 24,\n                  \"sender_bounce_count\": 0,\n                  \"bounce_percentage\": 1.2,\n                  \"unsubscribed_count\": 1,\n                  \"positive_reply_count\": 7\n                }\n              }\n            ],\n            \"linkedin_stats\": null,\n            \"manual_step_stats\": null\n          }\n        ]\n      }\n    }\n  },\n  \"sequences\": {\n    \"12345\": {\n      \"success\": true,\n      \"data\": [\n        {\n          \"id\": 50001,\n          \"created_at\": \"2026-10-01T09:00:00Z\",\n          \"updated_at\": \"2026-10-01T09:00:00Z\",\n          \"email_campaign_id\": 12345,\n          \"seq_number\": 1,\n          \"subject\": \"Quick question about {{company_name}}\",\n          \"follow_up_subject\": null,\n          \"email_body\": \"<p>Synthetic step 1 body for campaign 12345.</p>\",\n          \"seq_delay_details\": {\n            \"delayInDays\": 0\n          },\n          \"sequence_variants\": [\n            {\n              \"id\": 90001,\n              \"variant_name\": \"Variant A\",\n              \"subject\": \"Quick question about {{company_name}}\",\n              \"email_body\": \"<p>Synthetic step 1 variant A body.</p>\"\n            },\n            {\n              \"id\": 90002,\n              \"variant_name\": \"Variant B\",\n              \"subject\": \"Quick question about {{company_name}}\",\n              \"email_body\": \"<p>Synthetic step 1 variant B body.</p>\"\n            }\n          ]\n        },\n        {\n          \"id\": 50002,\n          \"created_at\": \"2026-10-01T09:00:00Z\",\n          \"updated_at\": \"2026-10-01T09:00:00Z\",\n          \"email_campaign_id\": 12345,\n          \"seq_number\": 2,\n          \"subject\": \"\",\n          \"follow_up_subject\": null,\n          \"email_body\": \"<p>Synthetic step 2 body for campaign 12345.</p>\",\n          \"seq_delay_details\": {\n            \"delayInDays\": 3\n          },\n          \"sequence_variants\": [\n            {\n              \"id\": 90003,\n              \"variant_name\": \"Variant A\",\n              \"subject\": \"\",\n              \"email_body\": \"<p>Synthetic step 2 variant A body.</p>\",\n              \"variant_distribution_percentage\": 50\n            },\n            {\n              \"id\": 90004,\n              \"variant_name\": \"Variant B\",\n              \"subject\": \"\",\n              \"email_body\": \"<p>Synthetic step 2 variant B body.</p>\",\n              \"variant_distribution_percentage\": 50\n            }\n          ]\n        },\n        {\n          \"id\": 50003,\n          \"created_at\": \"2026-10-01T09:00:00Z\",\n          \"updated_at\": \"2026-10-01T09:00:00Z\",\n          \"email_campaign_id\": 12345,\n          \"seq_number\": 3,\n          \"subject\": \"\",\n          \"follow_up_subject\": null,\n          \"email_body\": \"<p>Synthetic step 3 body for campaign 12345.</p>\",\n          \"seq_delay_details\": {\n            \"delayInDays\": 5\n          },\n          \"sequence_variants\": []\n        }\n      ]\n    },\n    \"12346\": {\n      \"success\": true,\n      \"data\": [\n        {\n          \"id\": 50011,\n          \"created_at\": \"2026-10-01T09:00:00Z\",\n          \"updated_at\": \"2026-10-01T09:00:00Z\",\n          \"email_campaign_id\": 12346,\n          \"seq_number\": 1,\n          \"subject\": \"{{first_name}}, idea for {{company_name}}\",\n          \"follow_up_subject\": null,\n          \"email_body\": \"<p>Synthetic step 1 body for campaign 12346.</p>\",\n          \"seq_delay_details\": {\n            \"delayInDays\": 0\n          },\n          \"sequence_variants\": [\n            {\n              \"id\": 90011,\n              \"variant_name\": \"Variant A\",\n              \"subject\": \"{{first_name}}, idea for {{company_name}}\",\n              \"email_body\": \"<p>Synthetic step 1 variant A body.</p>\"\n            },\n            {\n              \"id\": 90012,\n              \"variant_name\": \"Variant B\",\n              \"subject\": \"{{first_name}}, idea for {{company_name}}\",\n              \"email_body\": \"<p>Synthetic step 1 variant B body.</p>\"\n            },\n            {\n              \"id\": 90013,\n              \"variant_name\": \"Variant C\",\n              \"subject\": \"{{first_name}}, idea for {{company_name}}\",\n              \"email_body\": \"<p>Synthetic step 1 variant C body.</p>\"\n            }\n          ]\n        },\n        {\n          \"id\": 50012,\n          \"created_at\": \"2026-10-01T09:00:00Z\",\n          \"updated_at\": \"2026-10-01T09:00:00Z\",\n          \"email_campaign_id\": 12346,\n          \"seq_number\": 2,\n          \"subject\": \"\",\n          \"follow_up_subject\": null,\n          \"email_body\": \"<p>Synthetic step 2 body for campaign 12346.</p>\",\n          \"seq_delay_details\": {\n            \"delayInDays\": 4\n          },\n          \"sequence_variants\": []\n        }\n      ]\n    },\n    \"12347\": {\n      \"success\": true,\n      \"data\": [\n        {\n          \"id\": 50021,\n          \"created_at\": \"2026-10-01T09:00:00Z\",\n          \"updated_at\": \"2026-10-01T09:00:00Z\",\n          \"email_campaign_id\": 12347,\n          \"seq_number\": 1,\n          \"subject\": \"Worth a look?\",\n          \"follow_up_subject\": null,\n          \"email_body\": \"<p>Synthetic step 1 body for campaign 12347.</p>\",\n          \"seq_delay_details\": {\n            \"delayInDays\": 0\n          },\n          \"sequence_variants\": [\n            {\n              \"id\": 90021,\n              \"variant_name\": \"Variant A\",\n              \"subject\": \"Worth a look?\",\n              \"email_body\": \"<p>Synthetic step 1 variant A body.</p>\"\n            },\n            {\n              \"id\": 90022,\n              \"variant_name\": \"Variant B\",\n              \"subject\": \"Worth a look?\",\n              \"email_body\": \"<p>Synthetic step 1 variant B body.</p>\"\n            }\n          ]\n        }\n      ]\n    },\n    \"12348\": {\n      \"success\": true,\n      \"data\": [\n        {\n          \"id\": 50031,\n          \"created_at\": \"2026-10-01T09:00:00Z\",\n          \"updated_at\": \"2026-10-01T09:00:00Z\",\n          \"email_campaign_id\": 12348,\n          \"seq_number\": 1,\n          \"subject\": \"Saw your team is hiring\",\n          \"follow_up_subject\": null,\n          \"email_body\": \"<p>Synthetic step 1 body for campaign 12348.</p>\",\n          \"seq_delay_details\": {\n            \"delayInDays\": 0\n          },\n          \"sequence_variants\": [\n            {\n              \"id\": 90031,\n              \"variant_name\": \"Variant A\",\n              \"subject\": \"Saw your team is hiring\",\n              \"email_body\": \"<p>Synthetic step 1 variant A body.</p>\"\n            },\n            {\n              \"id\": 90032,\n              \"variant_name\": \"Variant B\",\n              \"subject\": \"Saw your team is hiring\",\n              \"email_body\": \"<p>Synthetic step 1 variant B body.</p>\"\n            }\n          ]\n        }\n      ]\n    },\n    \"12350\": {\n      \"success\": true,\n      \"data\": [\n        {\n          \"id\": 50051,\n          \"created_at\": \"2026-10-01T09:00:00Z\",\n          \"updated_at\": \"2026-10-01T09:00:00Z\",\n          \"email_campaign_id\": 12350,\n          \"seq_number\": 1,\n          \"subject\": \"Short note\",\n          \"follow_up_subject\": null,\n          \"email_body\": \"<p>Synthetic step 1 body for campaign 12350.</p>\",\n          \"seq_delay_details\": {\n            \"delayInDays\": 0\n          },\n          \"sequence_variants\": [\n            {\n              \"id\": 90051,\n              \"variant_name\": \"Variant A\",\n              \"subject\": \"Short note\",\n              \"email_body\": \"<p>Synthetic step 1 variant A body.</p>\"\n            },\n            {\n              \"id\": 90052,\n              \"variant_name\": \"Variant B\",\n              \"subject\": \"Short note\",\n              \"email_body\": \"<p>Synthetic step 1 variant B body.</p>\"\n            }\n          ]\n        }\n      ]\n    }\n  }\n};\nconst sel = (c) => {\n  if (String(c.status).toUpperCase() !== 'ACTIVE') return 'not_active';\n  if (c.parent_campaign_id) return 'subsequence';\n  if (cfg.campaignIds.length && !cfg.campaignIds.includes(String(c.id))) return 'not_in_campaign_ids';\n  if (cfg.campaignTag && !(c.tags || []).some((t) => String(t.tag_name).toLowerCase() === cfg.campaignTag.toLowerCase())) return 'missing_campaign_tag';\n  return null;\n};\nconst skipped = [];\nconst campaigns = [];\nfor (const c of FIXTURE.campaigns) {\n  const why = sel(c);\n  if (why) { skipped.push({ campaignId: String(c.id), name: c.name, reason: why }); continue; }\n  if (campaigns.length >= cfg.maxCampaigns) { skipped.push({ campaignId: String(c.id), name: c.name, reason: 'over_max_campaigns' }); continue; }\n  campaigns.push({ campaignId: String(c.id), name: c.name, status: c.status, analytics: FIXTURE.sequence_analytics[String(c.id)] || null, sequences: FIXTURE.sequences[String(c.id)] || null });\n}\nreturn [{ json: { source: 'mock', window: { start: cfg.windowStart, end: cfg.windowEnd }, campaigns, skipped } }];\n"
+      },
+      "id": "5158522a-5da9-5944-b5fd-8ece430870c3",
+      "name": "Mock Smartlead Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        0
+      ],
+      "notes": "sample-payloads/campaign-stats.json; same selection rules.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config & Safety Gate').first().json.config.smartleadBaseUrl }}/campaigns/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.SMARTLEAD_API_KEY }}"
+            },
+            {
+              "name": "include_tags",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "9fd79560-c9d9-5864-a418-f41694d07c47",
+      "name": "Smartlead: List Campaigns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "All campaigns (direct array).",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Select Campaigns\n// From GET /campaigns/ keep ACTIVE main campaigns (no subsequences), optionally\n// limited by CAMPAIGN_IDS and CAMPAIGN_TAG, capped at MAX_CAMPAIGNS_PER_RUN.\n// Skipped campaigns are reported (first 50).\n// Emits one item per campaign for the per-campaign Smartlead reads.\n// ─────────────────────────────────────────────────────────────────────────────\nconst cfg = $('Config & Safety Gate').first().json.config;\n// n8n splits a top-level JSON array into one item per element; a wrapped\n// response ({ campaigns: [...] }) arrives as one item. Accept both.\nconst items = $input.all().map((i) => i.json);\nif (items.length === 1 && items[0].error) throw new Error(`Smartlead campaign list failed: ${JSON.stringify(items[0].error).slice(0, 200)}`);\nconst list = items.flatMap((j) => (Array.isArray(j.campaigns) ? j.campaigns : Array.isArray(j.data) ? j.data : (j.id !== undefined ? [j] : [])));\nconst skipped = [];\nconst out = [];\nfor (const c of list) {\n  let why = null;\n  if (String(c.status).toUpperCase() !== 'ACTIVE') why = 'not_active';\n  else if (c.parent_campaign_id) why = 'subsequence';\n  else if (cfg.campaignIds.length && !cfg.campaignIds.includes(String(c.id))) why = 'not_in_campaign_ids';\n  else if (cfg.campaignTag && !(c.tags || []).some((t) => String(t.tag_name).toLowerCase() === cfg.campaignTag.toLowerCase())) why = 'missing_campaign_tag';\n  else if (out.length >= cfg.maxCampaigns) why = 'over_max_campaigns';\n  if (why) { if (skipped.length < 50) skipped.push({ campaignId: String(c.id), name: c.name, reason: why }); continue; }\n  out.push({ json: { campaignId: String(c.id), name: c.name, status: c.status, skipped } });\n}\nif (!out.length) return [{ json: { campaignId: null, skipped, listed: list.length } }];\nreturn out;\n"
+      },
+      "id": "cdfa9cae-ac73-5035-8f58-24cfa5f48b32",
+      "name": "Select Campaigns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        300
+      ],
+      "notes": "ACTIVE, not a subsequence, CAMPAIGN_IDS / CAMPAIGN_TAG, MAX_CAMPAIGNS_PER_RUN.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "8312af6e-37a6-537a-9d13-87ed1afeedb4",
+              "leftValue": "={{ Boolean($json.campaignId) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a98343da-f407-558d-97fc-c8559e33b973",
+      "name": "Has Campaigns?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config & Safety Gate').first().json.config.smartleadBaseUrl }}/campaigns/{{ $json.campaignId }}/sequence-analytics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.SMARTLEAD_API_KEY }}"
+            },
+            {
+              "name": "start_date",
+              "value": "={{ $('Config & Safety Gate').first().json.config.windowStart }}"
+            },
+            {
+              "name": "end_date",
+              "value": "={{ $('Config & Safety Gate').first().json.config.windowEnd }}"
+            },
+            {
+              "name": "time_zone",
+              "value": "={{ $('Config & Safety Gate').first().json.config.timeZone }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "b52b9b2d-c05a-5aa4-a2e3-97093e4d2b74",
+      "name": "Smartlead: Get Sequence Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        240
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Per-step, per-variant counters for the window.",
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config & Safety Gate').first().json.config.smartleadBaseUrl }}/campaigns/{{ $('Select Campaigns').all()[$itemIndex].json.campaignId }}/sequences",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.SMARTLEAD_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "2942c0d6-ea6e-5624-9c1c-cd879cc14cf4",
+      "name": "Smartlead: Get Sequences",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        240
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Step ids, copy, delays and variant ids needed to save a split.",
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Collect Campaign Data\n// Joins, by item index, each selected campaign with its sequence-analytics\n// and sequences responses into the same shape the sandbox produces.\n// ─────────────────────────────────────────────────────────────────────────────\nconst cfg = $('Config & Safety Gate').first().json.config;\nconst sel = $('Select Campaigns').all();\nconst an = $('Smartlead: Get Sequence Analytics').all();\nconst sq = $input.all();\nif (an.length !== sel.length || sq.length !== sel.length) throw new Error(`Campaign data mismatch: ${sel.length} campaigns vs ${an.length} analytics / ${sq.length} sequences responses. Unpin the Smartlead read nodes or align their items.`);\nconst campaigns = sel.map((s, i) => ({\n  campaignId: s.json.campaignId, name: s.json.name, status: s.json.status,\n  analytics: an[i].json.error ? null : an[i].json,\n  sequences: sq[i].json.error ? null : sq[i].json,\n  readErrors: [an[i].json.error ? 'sequence_analytics_failed' : null, sq[i].json.error ? 'sequences_failed' : null].filter(Boolean),\n}));\nreturn [{ json: { source: 'smartlead', window: { start: cfg.windowStart, end: cfg.windowEnd }, campaigns, skipped: sel[0].json.skipped || [] } }];\n"
+      },
+      "id": "de38000a-2a33-5ff6-9622-aeb93e6f6bc3",
+      "name": "Collect Campaign Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Statistical Evaluation\n// Per campaign step with 2+ variants:\n//   1. Sample gate: every variant needs ≥ MIN_SAMPLE_SIZE sends in the window.\n//   2. Leader = highest rate on TEST_METRIC (reply | positive_reply).\n//   3. Each challenger vs. the leader: two-proportion z-test (pooled), one-sided\n//      p-value, Bonferroni-adjusted alpha = ALPHA / (k − 1).\n//   4. A challenger is a loser only if p < adjusted alpha AND the leader's\n//      relative lift ≥ MIN_RELATIVE_LIFT.\n//   5. Guardrails on the leader: ≥ MIN_WINNER_EVENTS events, rate ≥\n//      MIN_WINNER_RATE_PCT, bounce ≤ MAX_BOUNCE_RATE_PCT. Cooldown per step.\n// Decision per step:\n//   promote_winner  — every challenger is a loser → winner takes the traffic\n//   pause_losers    — some challengers lose, others are inconclusive\n//   keep_running    — inconclusive / insufficient sample / guardrail\n// ─────────────────────────────────────────────────────────────────────────────\nconst cfg = $('Config & Safety Gate').first().json.config;\nconst data = $input.first().json;\n\n// Standard normal upper tail via erfc (Abramowitz & Stegun 7.1.26, |error| < 1.5e-7).\nconst erfc = (x) => {\n  const z = Math.abs(x); const t = 1 / (1 + 0.3275911 * z);\n  const y = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-z * z);\n  return x >= 0 ? y : 2 - y;\n};\nconst upperTail = (z) => 0.5 * erfc(z / Math.SQRT2);\nconst zTest = (x1, n1, x2, n2) => {\n  const p1 = x1 / n1; const p2 = x2 / n2; const p = (x1 + x2) / (n1 + n2);\n  const se = Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2));\n  if (!(se > 0)) return { z: 0, p: 1 };\n  const z = (p1 - p2) / se;\n  return { z, p: upperTail(z) };\n};\nconst r4 = (x) => Math.round(x * 10000) / 10000;\n\nlet store = null;\ntry { store = $getWorkflowStaticData('global'); } catch (e) { store = null; }\nconst changes = (store && store.lastChange) || {};\n\nconst results = [];\nfor (const c of data.campaigns) {\n  const camp = { campaignId: c.campaignId, name: c.name, steps: [], errors: [...(c.readErrors || [])] };\n  const seqs = c.analytics?.data?.sequences || [];\n  if (!c.analytics) camp.errors.push('no_analytics');\n  for (const s of seqs) {\n    const vars = (s.variants || []).map((v) => {\n      const st = v.stats || {};\n      const n = Number(st.sent_count) || 0;\n      const x = Number(cfg.testMetric === 'positive_reply' ? st.positive_reply_count : st.reply_count) || 0;\n      return { variantId: String(v.id), label: String(v.variant_label || v.id), isBaseline: Boolean(v.is_baseline), sent: n, events: x, rate: n ? x / n : 0, bouncePct: Number(st.bounce_percentage) || 0 };\n    });\n    const step = { stepId: String(s.id), seqNumber: s.seq_number, variants: vars, decision: 'keep_running', reason: null, winner: null, losers: [], inconclusive: [], comparisons: [] };\n    camp.steps.push(step);\n    if (vars.length < 2) { step.reason = 'single_variant'; continue; }\n    const small = vars.filter((v) => v.sent < cfg.minSampleSize);\n    if (small.length) { step.reason = `insufficient_sample (${small.map((v) => `${v.label}:${v.sent}`).join(', ')} < ${cfg.minSampleSize})`; continue; }\n\n    const sorted = [...vars].sort((a, b) => b.rate - a.rate || b.sent - a.sent);\n    const leader = sorted[0];\n    const k = vars.length;\n    const alphaAdj = cfg.alpha / (k - 1);\n    for (const ch of sorted.slice(1)) {\n      const t = zTest(leader.events, leader.sent, ch.events, ch.sent);\n      const lift = ch.rate > 0 ? (leader.rate - ch.rate) / ch.rate : (leader.rate > 0 ? Infinity : 0);\n      const significant = t.p < alphaAdj && lift >= cfg.minRelativeLift;\n      step.comparisons.push({ leader: leader.label, challenger: ch.label, leaderRate: r4(leader.rate), challengerRate: r4(ch.rate), z: Math.round(t.z * 100) / 100, pValue: Number(t.p.toExponential(3)), alphaAdjusted: Number(alphaAdj.toPrecision(3)), relativeLift: Number.isFinite(lift) ? Math.round(lift * 1000) / 1000 : null, significant });\n      (significant ? step.losers : step.inconclusive).push(ch.variantId);\n    }\n    step.leader = leader.variantId;\n\n    // Guardrails on the leader\n    const key = `${c.campaignId}:${s.id}`;\n    const last = changes[key];\n    if (!step.losers.length) { step.reason = 'no_significant_difference'; continue; }\n    if (leader.events < cfg.minWinnerEvents) { step.reason = `leader_below_min_events (${leader.events} < ${cfg.minWinnerEvents})`; continue; }\n    if (leader.rate * 100 < cfg.minWinnerRatePct) { step.reason = `leader_below_rate_threshold (${(leader.rate * 100).toFixed(2)}% < ${cfg.minWinnerRatePct}%)`; continue; }\n    if (leader.bouncePct > cfg.maxBounceRatePct) { step.reason = `leader_bounce_rate_too_high (${leader.bouncePct}% > ${cfg.maxBounceRatePct}%)`; continue; }\n    if (last && Date.now() - last < cfg.cooldownDays * 86400000) { step.reason = `cooldown (changed ${Math.floor((Date.now() - last) / 86400000)}d ago)`; continue; }\n\n    step.winner = step.inconclusive.length ? null : leader.variantId;\n    step.decision = step.inconclusive.length ? 'pause_losers' : 'promote_winner';\n    step.reason = step.inconclusive.length ? `${step.losers.length} significant loser(s), ${step.inconclusive.length} still inconclusive` : `all ${k - 1} challenger(s) significantly worse`;\n  }\n  results.push(camp);\n}\nconst all = results.flatMap((c) => c.steps);\nconst counts = { campaigns: results.length, steps: all.length, tested: all.filter((s) => s.variants.length > 1).length, promote_winner: all.filter((s) => s.decision === 'promote_winner').length, pause_losers: all.filter((s) => s.decision === 'pause_losers').length, keep_running: all.filter((s) => s.decision === 'keep_running' && s.variants.length > 1).length };\nreturn [{ json: { source: data.source, window: data.window, skipped: data.skipped, counts, campaigns: results } }];\n"
+      },
+      "id": "a0a2e284-f3ca-535f-8c43-7fd8bc121a3f",
+      "name": "Statistical Evaluation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        100
+      ],
+      "notes": "Sample gate, z-test vs leader, Bonferroni, guardrails, cooldown.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Compose Variant Changes\n// Turns step decisions into one Smartlead \"save sequences\" payload per campaign.\n// Smartlead saves the whole sequence, so every step is rebuilt from\n// GET /campaigns/{id}/sequences with its id, copy and delay unchanged. Only the\n// decided steps get a new MANUAL_PERCENTAGE split:\n//   losers       → LOSER_FLOOR_PERCENT (0 = paused)\n//   inconclusive → current share, rounded down to a multiple of 10 (min 10)\n//   leader       → the remainder\n// Smartlead only honours multiples of 10 in manual splits.\n// Pre-flight checks block a campaign instead of sending a partial payload.\n// An untouched multi-variant step whose split the API doesn't expose blocks\n// the campaign unless ALLOW_EQUAL_SPLIT_ASSUMPTION=true.\n// ─────────────────────────────────────────────────────────────────────────────\nconst cfg = $('Config & Safety Gate').first().json.config;\nconst ev = $input.first().json;\nconst SHARE_KEYS = ['variant_distribution_percentage', 'distribution_percentage', 'distribution', 'variant_distribution'];\nconst shareOf = (v) => { for (const k of SHARE_KEYS) if (Number.isFinite(Number(v[k])) && v[k] !== null && v[k] !== '') return Number(v[k]); return null; };\nconst labelOf = (v) => String(v.variant_label || v.variant_name || '').replace(/^variant\\s+/i, '').trim();\nconst fromData = $('Mock Smartlead Data').isExecuted ? $('Mock Smartlead Data').first().json : $('Collect Campaign Data').first().json;\nconst byId = new Map(fromData.campaigns.map((c) => [c.campaignId, c]));\n\nconst mutations = [];\nconst blocked = [];\nconst changes = [];\nfor (const camp of ev.campaigns) {\n  const decided = camp.steps.filter((s) => s.decision !== 'keep_running');\n  if (!decided.length) continue;\n  const raw = byId.get(camp.campaignId);\n  const steps = raw?.sequences?.data;\n  const block = (reason) => blocked.push({ campaignId: camp.campaignId, name: camp.name, reason });\n  if (!Array.isArray(steps) || !steps.length) { block('sequences_unavailable'); continue; }\n  if (steps.some((st) => typeof st.email_body !== 'string' || !st.email_body.trim())) { block('step_without_email_body (refusing to rewrite copy)'); continue; }\n\n  const notes = [];\n  let ok = true;\n  const payloadSteps = steps.map((st) => {\n    const sv = Array.isArray(st.sequence_variants) ? st.sequence_variants : (Array.isArray(st.seq_variants) ? st.seq_variants : []);\n    const base = { id: st.id, seq_number: st.seq_number, subject: st.subject ?? '', email_body: st.email_body, seq_delay_details: { delay_in_days: Number(st.seq_delay_details?.delayInDays ?? st.seq_delay_details?.delay_in_days ?? 0) } };\n    if (sv.length < 2) return base;\n    const d = decided.find((x) => String(x.stepId) === String(st.id) || x.seqNumber === st.seq_number);\n    const current = sv.map(shareOf);\n    const known = current.every((x) => x !== null);\n    if (!d) {\n      if (known) return { ...base, variant_distribution_type: 'MANUAL_PERCENTAGE', seq_variants: sv.map((v, i) => ({ id: v.id, subject: v.subject ?? '', email_body: v.email_body, variant_label: labelOf(v), variant_distribution_percentage: current[i] })) };\n      if (!cfg.allowEqualSplitAssumption) { ok = false; notes.push(`step ${st.seq_number}: has ${sv.length} variants but its current split is not exposed by the API; saving would reset it (set ALLOW_EQUAL_SPLIT_ASSUMPTION=true to accept MANUAL_EQUAL)`); return base; }\n      notes.push(`step ${st.seq_number}: current split not exposed by the API, saved as MANUAL_EQUAL`);\n      return { ...base, variant_distribution_type: 'MANUAL_EQUAL', seq_variants: sv.map((v) => ({ id: v.id, subject: v.subject ?? '', email_body: v.email_body, variant_label: labelOf(v) })) };\n    }\n    // Match analytics variants to sequence variants: id first, then label.\n    const find = (aid) => {\n      const a = d.variants.find((x) => x.variantId === aid);\n      return sv.findIndex((v) => String(v.id) === aid || (a && labelOf(v).toLowerCase() === a.label.toLowerCase()));\n    };\n    const idxLeader = find(d.leader);\n    const idxLosers = d.losers.map(find);\n    const idxInc = d.inconclusive.map(find);\n    if ([idxLeader, ...idxLosers, ...idxInc].some((i) => i < 0) || idxLosers.length + idxInc.length + 1 !== sv.length) {\n      ok = false; notes.push(`step ${st.seq_number}: analytics variants do not match the sequence variants`); return base;\n    }\n    const eq = 100 / sv.length;\n    const share = sv.map((_, i) => (known ? current[i] : eq));\n    const next = sv.map(() => 0);\n    for (const i of idxLosers) next[i] = cfg.loserFloorPercent;\n    for (const i of idxInc) next[i] = Math.max(10, Math.floor(share[i] / 10) * 10);\n    next[idxLeader] = 100 - next.reduce((a, b) => a + b, 0);\n    if (next[idxLeader] < 10 || next.some((x) => x % 10 !== 0) || next.reduce((a, b) => a + b, 0) !== 100) { ok = false; notes.push(`step ${st.seq_number}: no valid multiple-of-10 split`); return base; }\n    const label = (i) => labelOf(sv[i]) || String(sv[i].id);\n    changes.push({\n      campaignId: camp.campaignId, campaign: camp.name, stepId: String(st.id), seqNumber: st.seq_number, decision: d.decision,\n      winner: d.winner ? label(idxLeader) : null, leader: label(idxLeader),\n      before: Object.fromEntries(sv.map((_, i) => [label(i), Math.round(share[i])])), after: Object.fromEntries(sv.map((_, i) => [label(i), next[i]])),\n      comparisons: d.comparisons, assumedEqualSplit: !known,\n    });\n    return { ...base, variant_distribution_type: 'MANUAL_PERCENTAGE', seq_variants: sv.map((v, i) => ({ id: v.id, subject: v.subject ?? '', email_body: v.email_body, variant_label: labelOf(v), variant_distribution_percentage: next[i] })) };\n  });\n  if (!ok) { block(notes.join('; ')); for (let i = changes.length - 1; i >= 0; i -= 1) if (changes[i].campaignId === camp.campaignId) changes.splice(i, 1); continue; }\n  mutations.push({ campaignId: camp.campaignId, name: camp.name, notes, payload: { sequences: payloadSteps } });\n}\nreturn [{ json: { ...ev, changes, mutations, blocked, changeCount: changes.length } }];\n"
+      },
+      "id": "625a6315-f145-54c8-9cc8-92a475c58ace",
+      "name": "Compose Variant Changes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        100
+      ],
+      "notes": "New MANUAL_PERCENTAGE splits + full-sequence payload + pre-flight checks.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "0de62dbc-7bd7-5f5a-9a2f-3087e0d4f48b",
+              "leftValue": "={{ $json.changeCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bf54dbf8-5de7-5139-b4df-bce7af249fe1",
+      "name": "Has Changes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "f8cf529c-9047-50fa-bf95-8dc3b67cdc77",
+              "leftValue": "={{ $('Config & Safety Gate').first().json.config.promoteWinners }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1547fc37-e496-588c-9c26-ba960969c5e2",
+      "name": "Apply Changes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per campaign to change.\nreturn $('Compose Variant Changes').first().json.mutations.map((m) => ({ json: m }));\n"
+      },
+      "id": "ef1e7cb3-0154-51c6-b328-f726d9700d06",
+      "name": "Emit Campaign Mutations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2300,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config & Safety Gate').first().json.config.smartleadBaseUrl }}/campaigns/{{ $json.campaignId }}/status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.SMARTLEAD_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'PAUSED' }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "0f6b42d2-1d0b-546f-9c8d-4232e743b8a5",
+      "name": "Smartlead: Pause Campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2520,
+        -60
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Required: sequences cannot be edited while ACTIVE.",
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config & Safety Gate').first().json.config.smartleadBaseUrl }}/campaigns/{{ $('Emit Campaign Mutations').all()[$itemIndex].json.campaignId }}/sequences",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.SMARTLEAD_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Emit Campaign Mutations').all()[$itemIndex].json.payload) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "a878e0bf-2ef8-59b1-9b1b-1cfe95ed161a",
+      "name": "Smartlead: Save Sequence Split",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2740,
+        -60
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Full sequence with ids; only decided steps change split.",
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config & Safety Gate').first().json.config.smartleadBaseUrl }}/campaigns/{{ $('Emit Campaign Mutations').all()[$itemIndex].json.campaignId }}/status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.SMARTLEAD_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'START' }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "597619fd-d50d-51ac-8da2-82d84faab72d",
+      "name": "Smartlead: Resume Campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        -60
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "notes": "Always runs, also when the save failed.",
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Collect Mutation Results\n// Joins, by index, the pause → save → resume responses per campaign. A\n// campaign counts as applied only when the save succeeded; the resume result\n// is reported separately so a stuck pause is never silent. Records the change\n// time per step (production executions only) for COOLDOWN_DAYS.\n// ─────────────────────────────────────────────────────────────────────────────\nconst cfg = $('Config & Safety Gate').first().json.config;\nconst muts = $('Emit Campaign Mutations').all();\nconst pause = $('Smartlead: Pause Campaign').all();\nconst save = $('Smartlead: Save Sequence Split').all();\nconst resume = $input.all();\nif ([pause, save, resume].some((a) => a.length !== muts.length)) throw new Error(`Mutation result mismatch: ${muts.length} campaigns vs ${pause.length}/${save.length}/${resume.length} responses.`);\nconst failed = (j) => Boolean(j.error) || j.ok === false || j.success === false;\nconst results = muts.map((m, i) => ({\n  campaignId: m.json.campaignId, name: m.json.name,\n  paused: !failed(pause[i].json), saved: !failed(save[i].json), resumed: !failed(resume[i].json),\n  error: failed(save[i].json) ? String(save[i].json.error?.message || save[i].json.message || save[i].json.error || 'save_failed').slice(0, 200) : null,\n}));\nlet store = null;\ntry { store = $getWorkflowStaticData('global'); } catch (e) { store = null; }\nif (store && cfg.executionMode === 'production') {\n  store.lastChange = store.lastChange || {};\n  const changes = $('Compose Variant Changes').first().json.changes;\n  for (const r of results.filter((x) => x.saved)) for (const ch of changes.filter((c) => c.campaignId === r.campaignId)) store.lastChange[`${ch.campaignId}:${ch.stepId}`] = Date.now();\n}\nreturn [{ json: { results, applied: results.filter((r) => r.saved).length, failed: results.filter((r) => !r.saved).length, notResumed: results.filter((r) => !r.resumed).map((r) => r.campaignId) } }];\n"
+      },
+      "id": "7d12e1b9-58bf-58be-ad41-7f706706d25a",
+      "name": "Collect Mutation Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3180,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Build Notification\n// One Slack Block Kit message and one webhook JSON per run, describing what\n// was decided and what actually happened (applied / dry run / sandbox /\n// failed). Contains campaign names, variant labels and rates, no lead data.\n// ─────────────────────────────────────────────────────────────────────────────\nconst cfg = $('Config & Safety Gate').first().json.config;\nconst cmp = $('Compose Variant Changes').first().json;\nlet mut = null;\ntry { mut = $('Collect Mutation Results').isExecuted ? $('Collect Mutation Results').first().json : null; } catch (e) { mut = null; }\nconst mode = cfg.sandboxMode ? 'SANDBOX (synthetic data, nothing changed)' : cfg.promoteWinners ? 'LIVE (changes applied)' : 'DRY RUN (recommendations only)';\nconst pct = (x) => `${(x * 100).toFixed(2)}%`;\nconst statusOf = (cid) => {\n  if (!mut) return cfg.promoteWinners ? 'not_applied' : 'recommended';\n  const r = mut.results.find((x) => x.campaignId === cid);\n  if (!r) return 'not_applied';\n  return r.saved ? (r.resumed ? 'applied' : 'applied_but_not_resumed') : (r.resumed ? 'failed_resumed' : 'failed_campaign_paused');\n};\nconst kept = cmp.campaigns.flatMap((c) => c.steps.filter((s) => s.decision === 'keep_running' && s.variants.length > 1).map((s) => ({ campaign: c.name, seq: s.seqNumber, reason: s.reason })));\n\nconst blocks = [\n  { type: 'header', text: { type: 'plain_text', text: 'Smartlead A/B auto-promoter', emoji: true } },\n  { type: 'context', elements: [{ type: 'mrkdwn', text: `*${mode}* · metric \\`${cfg.testMetric}\\` · window ${cfg.windowDays}d · min ${cfg.minSampleSize} sends/variant · α ${cfg.alpha}` }] },\n  { type: 'section', text: { type: 'mrkdwn', text: `*${cmp.counts.promote_winner}* winner(s) promoted · *${cmp.counts.pause_losers}* step(s) with losers paused · *${cmp.counts.keep_running}* still running · ${cmp.blocked.length} blocked` } },\n];\nfor (const ch of cmp.changes.slice(0, 15)) {\n  const lines = ch.comparisons.map((x) => `• ${x.leader} ${pct(x.leaderRate)} vs ${x.challenger} ${pct(x.challengerRate)} · p=${x.pValue} ${x.significant ? '✅' : '…'}`).join('\\n');\n  const split = Object.entries(ch.after).map(([k, v]) => `${k} ${ch.before[k]}→${v}%`).join(' · ');\n  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `${ch.decision === 'promote_winner' ? '🏆' : '✂️'} *${ch.campaign}* · step ${ch.seqNumber} · \\`${statusOf(ch.campaignId)}\\`\\n${split}${ch.assumedEqualSplit ? ' _(prior split assumed equal)_' : ''}\\n${lines}`.slice(0, 2900) } });\n}\nif (cmp.blocked.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `⛔ *Blocked*\\n${cmp.blocked.map((b) => `• ${b.name}: ${b.reason}`).join('\\n')}`.slice(0, 2900) } });\nif (mut && mut.notResumed.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `🚨 *Campaigns may still be PAUSED:* ${mut.notResumed.join(', ')}. Resume them in Smartlead.` } });\nif (kept.length) blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `Still running: ${kept.slice(0, 8).map((k) => `${k.campaign} s${k.seq} (${k.reason})`).join(' · ')}`.slice(0, 2900) }] });\nblocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `n8n run ${cfg.runId}` }] });\n\nconst worthNotifying = cmp.changes.length > 0 || cmp.blocked.length > 0 || (mut && mut.failed > 0) || cfg.notifyOnNoChange;\nconst summary = `A/B auto-promoter: ${cmp.counts.promote_winner} promoted, ${cmp.counts.pause_losers} with losers paused, ${cmp.counts.keep_running} running (${mode}).`;\nreturn [{ json: {\n  worthNotifying,\n  slackBody: { text: summary, blocks },\n  webhookBody: { event: 'smartlead.ab_test.evaluated', generatedAt: new Date().toISOString(), runId: cfg.runId, mode: cfg.sandboxMode ? 'sandbox' : cfg.promoteWinners ? 'live' : 'dry_run',\n    settings: { metric: cfg.testMetric, windowDays: cfg.windowDays, minSampleSize: cfg.minSampleSize, alpha: cfg.alpha, minRelativeLift: cfg.minRelativeLift, loserFloorPercent: cfg.loserFloorPercent },\n    counts: cmp.counts, changes: cmp.changes.map((c) => ({ ...c, status: statusOf(c.campaignId) })), blocked: cmp.blocked, stillRunning: kept },\n} }];\n"
+      },
+      "id": "8836a753-d36f-537e-9fdf-bd642da895e0",
+      "name": "Build Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3400,
+        160
+      ],
+      "notes": "Slack blocks + webhook JSON.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "ff4c6abe-2b50-50af-a341-3bbe23591f93",
+              "leftValue": "={{ $json.worthNotifying }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8fa6cc22-af62-52d6-8640-173023412b85",
+      "name": "Notify?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3620,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "45954e54-4231-5025-b06f-45a43bdf8a2d",
+              "leftValue": "={{ $('Config & Safety Gate').first().json.config.slackEnabled }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "552acc7f-33a5-5807-b192-7788efef1c5f",
+      "name": "Slack Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Build Notification').first().json.slackBody) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "09bb0220-8b6f-563c-9716-ffedf63dd91e",
+      "name": "Slack: Post Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4060,
+        20
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Slack incoming webhook.",
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "8b0917d4-6554-56a6-bb6c-64006d7d1fb7",
+              "leftValue": "={{ $('Config & Safety Gate').first().json.config.webhookEnabled }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2f241c86-6d8d-5307-b23f-96de14d43799",
+      "name": "Webhook Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4280,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ALERT_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.ALERT_WEBHOOK_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Build Notification').first().json.webhookBody) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "54c536b7-9559-5650-9e7c-ff0d9a11b61f",
+      "name": "Webhook: Post Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4500,
+        20
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Generic JSON webhook.",
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Execution Summary & Audit\n// Final record on every path. No secrets, no lead data.\n// ─────────────────────────────────────────────────────────────────────────────\nconst cfg = $('Config & Safety Gate').first().json.config;\nconst one = (n) => { try { return $(n).isExecuted ? $(n).first().json : null; } catch (e) { return null; } };\nconst all = (n) => { try { return $(n).isExecuted ? $(n).all().map((i) => i.json) : []; } catch (e) { return []; } };\nconst ev = one('Statistical Evaluation');\nconst cmp = one('Compose Variant Changes');\nconst mut = one('Collect Mutation Results');\nconst sl = all('Slack: Post Summary');\nconst wh = all('Webhook: Post Summary');\nconst sel = one('Mock Smartlead Data') || one('Collect Campaign Data') || {};\n\nlet outcome = 'no_tests_evaluated';\nif (ev && cmp) {\n  if (!cmp.changes.length) outcome = cmp.blocked.length ? 'changes_blocked' : 'no_changes_needed';\n  else if (cfg.sandboxMode) outcome = 'changes_found_sandbox';\n  else if (!cfg.promoteWinners) outcome = 'changes_recommended_dry_run';\n  else if (mut && mut.failed) outcome = mut.notResumed.length ? 'changes_failed_campaign_paused' : 'changes_partially_applied';\n  else outcome = 'changes_applied';\n}\nreturn [{ json: {\n  workflow: 'n8n-smartlead-campaign-ab-test-winner-auto-promoter',\n  runId: cfg.runId, executionMode: cfg.executionMode, finishedAt: new Date().toISOString(), outcome,\n  safety: { sandboxMode: cfg.sandboxMode, dryRun: cfg.dryRun, promoteWinners: cfg.promoteWinners },\n  settings: { metric: cfg.testMetric, windowDays: cfg.windowDays, minSampleSize: cfg.minSampleSize, alpha: cfg.alpha, minRelativeLift: cfg.minRelativeLift, minWinnerRatePct: cfg.minWinnerRatePct, minWinnerEvents: cfg.minWinnerEvents, maxBounceRatePct: cfg.maxBounceRatePct, loserFloorPercent: cfg.loserFloorPercent, cooldownDays: cfg.cooldownDays },\n  source: sel.source || null, window: sel.window || null,\n  campaignsSkipped: sel.skipped || [],\n  counts: ev ? ev.counts : null,\n  steps: ev ? ev.campaigns.flatMap((c) => c.steps.filter((s) => s.variants.length > 1).map((s) => ({ campaignId: c.campaignId, step: s.seqNumber, decision: s.decision, reason: s.reason, variants: s.variants.map((v) => `${v.label}:${v.events}/${v.sent}`) }))) : [],\n  changes: cmp ? cmp.changes.map((c) => ({ campaignId: c.campaignId, step: c.seqNumber, decision: c.decision, before: c.before, after: c.after })) : [],\n  blocked: cmp ? cmp.blocked : [],\n  mutations: mut ? mut.results : [],\n  notifications: { slack: sl.length ? (sl.some((x) => x.error) ? 'failed' : 'sent') : 'not_sent', webhook: wh.length ? (wh.some((x) => x.error) ? 'failed' : 'sent') : 'not_sent' },\n} }];\n"
+      },
+      "id": "425d61bb-587a-5db0-aeee-da1fe0c3f2fb",
+      "name": "Execution Summary & Audit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4720,
+        300
+      ],
+      "notes": "Final record on every path.",
+      "notesInFlow": false
+    }
+  ],
+  "connections": {
+    "Daily A/B Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Config & Safety Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config & Safety Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config & Safety Gate": {
+      "main": [
+        [
+          {
+            "node": "Sandbox Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sandbox Mode?": {
+      "main": [
+        [
+          {
+            "node": "Mock Smartlead Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Smartlead: List Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Smartlead Data": {
+      "main": [
+        [
+          {
+            "node": "Statistical Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smartlead: List Campaigns": {
+      "main": [
+        [
+          {
+            "node": "Select Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Campaigns": {
+      "main": [
+        [
+          {
+            "node": "Has Campaigns?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Campaigns?": {
+      "main": [
+        [
+          {
+            "node": "Smartlead: Get Sequence Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execution Summary & Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smartlead: Get Sequence Analytics": {
+      "main": [
+        [
+          {
+            "node": "Smartlead: Get Sequences",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smartlead: Get Sequences": {
+      "main": [
+        [
+          {
+            "node": "Collect Campaign Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Campaign Data": {
+      "main": [
+        [
+          {
+            "node": "Statistical Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Statistical Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Compose Variant Changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Variant Changes": {
+      "main": [
+        [
+          {
+            "node": "Has Changes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Changes?": {
+      "main": [
+        [
+          {
+            "node": "Apply Changes?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Changes?": {
+      "main": [
+        [
+          {
+            "node": "Emit Campaign Mutations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emit Campaign Mutations": {
+      "main": [
+        [
+          {
+            "node": "Smartlead: Pause Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smartlead: Pause Campaign": {
+      "main": [
+        [
+          {
+            "node": "Smartlead: Save Sequence Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smartlead: Save Sequence Split": {
+      "main": [
+        [
+          {
+            "node": "Smartlead: Resume Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smartlead: Resume Campaign": {
+      "main": [
+        [
+          {
+            "node": "Collect Mutation Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Mutation Results": {
+      "main": [
+        [
+          {
+            "node": "Build Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notification": {
+      "main": [
+        [
+          {
+            "node": "Notify?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify?": {
+      "main": [
+        [
+          {
+            "node": "Slack Enabled?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execution Summary & Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Enabled?": {
+      "main": [
+        [
+          {
+            "node": "Slack: Post Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook Enabled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Post Summary": {
+      "main": [
+        [
+          {
+            "node": "Webhook Enabled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Enabled?": {
+      "main": [
+        [
+          {
+            "node": "Webhook: Post Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execution Summary & Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Post Summary": {
+      "main": [
+        [
+          {
+            "node": "Execution Summary & Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Smartlead: List Campaigns": [
+      {
+        "json": {
+          "id": 12345,
+          "name": "campaign_id_12345 · Synthetic Ops Leaders Q4",
+          "status": "ACTIVE",
+          "created_at": "2026-10-01T09:00:00.000Z",
+          "parent_campaign_id": null,
+          "client_id": null,
+          "max_leads_per_day": 300,
+          "tags": [
+            {
+              "tag_id": 1,
+              "tag_name": "ab-auto",
+              "tag_color": "#2E7D32"
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "id": 12346,
+          "name": "campaign_id_12346 · Synthetic Finance Three-Way Test",
+          "status": "ACTIVE",
+          "created_at": "2026-10-01T09:00:00.000Z",
+          "parent_campaign_id": null,
+          "client_id": null,
+          "max_leads_per_day": 300,
+          "tags": [
+            {
+              "tag_id": 1,
+              "tag_name": "ab-auto",
+              "tag_color": "#2E7D32"
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "id": 12347,
+          "name": "campaign_id_12347 · Synthetic Early Test",
+          "status": "ACTIVE",
+          "created_at": "2026-10-01T09:00:00.000Z",
+          "parent_campaign_id": null,
+          "client_id": null,
+          "max_leads_per_day": 300,
+          "tags": [
+            {
+              "tag_id": 1,
+              "tag_name": "ab-auto",
+              "tag_color": "#2E7D32"
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "id": 12348,
+          "name": "campaign_id_12348 · Synthetic High-Bounce Winner",
+          "status": "ACTIVE",
+          "created_at": "2026-10-01T09:00:00.000Z",
+          "parent_campaign_id": null,
+          "client_id": null,
+          "max_leads_per_day": 300,
+          "tags": [
+            {
+              "tag_id": 1,
+              "tag_name": "ab-auto",
+              "tag_color": "#2E7D32"
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "id": 12349,
+          "name": "campaign_id_12349 · Synthetic Paused Campaign",
+          "status": "PAUSED",
+          "created_at": "2026-10-01T09:00:00.000Z",
+          "parent_campaign_id": null,
+          "client_id": null,
+          "max_leads_per_day": 300,
+          "tags": [
+            {
+              "tag_id": 1,
+              "tag_name": "ab-auto",
+              "tag_color": "#2E7D32"
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "id": 12350,
+          "name": "campaign_id_12350 · Synthetic Low-Reply Market",
+          "status": "ACTIVE",
+          "created_at": "2026-10-01T09:00:00.000Z",
+          "parent_campaign_id": null,
+          "client_id": null,
+          "max_leads_per_day": 300,
+          "tags": [
+            {
+              "tag_id": 1,
+              "tag_name": "ab-auto",
+              "tag_color": "#2E7D32"
+            }
+          ]
+        }
+      }
+    ],
+    "Smartlead: Get Sequence Analytics": [
+      {
+        "json": {
+          "ok": true,
+          "data": {
+            "campaign_id": 12345,
+            "sequences": [
+              {
+                "id": 50001,
+                "email_campaign_seq_id": 50001,
+                "seq_number": 1,
+                "seq_type": "EMAIL",
+                "seq_schedule_type": "IMMEDIATE",
+                "subject_line": "Quick question about {{company_name}}",
+                "seq_title": null,
+                "total_stats": {
+                  "sent_count": 2380,
+                  "reply_count": 65,
+                  "bounce_count": 28,
+                  "positive_reply_count": 32,
+                  "reply_percentage": 2.73
+                },
+                "engagement_level": "medium",
+                "variants": [
+                  {
+                    "id": 90001,
+                    "variant_label": "A",
+                    "is_baseline": true,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 1200,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 18,
+                      "reply_percentage": 1.5,
+                      "bounce_count": 14,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 9
+                    }
+                  },
+                  {
+                    "id": 90002,
+                    "variant_label": "B",
+                    "is_baseline": false,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 1180,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 47,
+                      "reply_percentage": 3.98,
+                      "bounce_count": 14,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 23
+                    }
+                  }
+                ],
+                "linkedin_stats": null,
+                "manual_step_stats": null
+              },
+              {
+                "id": 50002,
+                "email_campaign_seq_id": 50002,
+                "seq_number": 2,
+                "seq_type": "EMAIL",
+                "seq_schedule_type": "IMMEDIATE",
+                "subject_line": null,
+                "seq_title": null,
+                "total_stats": {
+                  "sent_count": 1295,
+                  "reply_count": 21,
+                  "bounce_count": 16,
+                  "positive_reply_count": 10,
+                  "reply_percentage": 1.62
+                },
+                "engagement_level": "medium",
+                "variants": [
+                  {
+                    "id": 90003,
+                    "variant_label": "A",
+                    "is_baseline": true,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 640,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 9,
+                      "reply_percentage": 1.41,
+                      "bounce_count": 8,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 4
+                    }
+                  },
+                  {
+                    "id": 90004,
+                    "variant_label": "B",
+                    "is_baseline": false,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 655,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 12,
+                      "reply_percentage": 1.83,
+                      "bounce_count": 8,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 6
+                    }
+                  }
+                ],
+                "linkedin_stats": null,
+                "manual_step_stats": null
+              }
+            ]
+          }
+        }
+      },
+      {
+        "json": {
+          "ok": true,
+          "data": {
+            "campaign_id": 12346,
+            "sequences": [
+              {
+                "id": 50011,
+                "email_campaign_seq_id": 50011,
+                "seq_number": 1,
+                "seq_type": "EMAIL",
+                "seq_schedule_type": "IMMEDIATE",
+                "subject_line": "{{first_name}}, idea for {{company_name}}",
+                "seq_title": null,
+                "total_stats": {
+                  "sent_count": 2650,
+                  "reply_count": 64,
+                  "bounce_count": 32,
+                  "positive_reply_count": 31,
+                  "reply_percentage": 2.42
+                },
+                "engagement_level": "medium",
+                "variants": [
+                  {
+                    "id": 90011,
+                    "variant_label": "A",
+                    "is_baseline": true,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 900,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 27,
+                      "reply_percentage": 3.0,
+                      "bounce_count": 11,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 13
+                    }
+                  },
+                  {
+                    "id": 90012,
+                    "variant_label": "B",
+                    "is_baseline": false,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 880,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 8,
+                      "reply_percentage": 0.91,
+                      "bounce_count": 11,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 4
+                    }
+                  },
+                  {
+                    "id": 90013,
+                    "variant_label": "C",
+                    "is_baseline": false,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 870,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 29,
+                      "reply_percentage": 3.33,
+                      "bounce_count": 10,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 14
+                    }
+                  }
+                ],
+                "linkedin_stats": null,
+                "manual_step_stats": null
+              }
+            ]
+          }
+        }
+      },
+      {
+        "json": {
+          "ok": true,
+          "data": {
+            "campaign_id": 12347,
+            "sequences": [
+              {
+                "id": 50021,
+                "email_campaign_seq_id": 50021,
+                "seq_number": 1,
+                "seq_type": "EMAIL",
+                "seq_schedule_type": "IMMEDIATE",
+                "subject_line": "Worth a look?",
+                "seq_title": null,
+                "total_stats": {
+                  "sent_count": 290,
+                  "reply_count": 9,
+                  "bounce_count": 4,
+                  "positive_reply_count": 4,
+                  "reply_percentage": 3.1
+                },
+                "engagement_level": "medium",
+                "variants": [
+                  {
+                    "id": 90021,
+                    "variant_label": "A",
+                    "is_baseline": true,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 150,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 2,
+                      "reply_percentage": 1.33,
+                      "bounce_count": 2,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 1
+                    }
+                  },
+                  {
+                    "id": 90022,
+                    "variant_label": "B",
+                    "is_baseline": false,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 140,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 7,
+                      "reply_percentage": 5.0,
+                      "bounce_count": 2,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 3
+                    }
+                  }
+                ],
+                "linkedin_stats": null,
+                "manual_step_stats": null
+              }
+            ]
+          }
+        }
+      },
+      {
+        "json": {
+          "ok": true,
+          "data": {
+            "campaign_id": 12348,
+            "sequences": [
+              {
+                "id": 50031,
+                "email_campaign_seq_id": 50031,
+                "seq_number": 1,
+                "seq_type": "EMAIL",
+                "seq_schedule_type": "IMMEDIATE",
+                "subject_line": "Saw your team is hiring",
+                "seq_title": null,
+                "total_stats": {
+                  "sent_count": 2010,
+                  "reply_count": 53,
+                  "bounce_count": 87,
+                  "positive_reply_count": 26,
+                  "reply_percentage": 2.64
+                },
+                "engagement_level": "medium",
+                "variants": [
+                  {
+                    "id": 90031,
+                    "variant_label": "A",
+                    "is_baseline": true,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 1000,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 12,
+                      "reply_percentage": 1.2,
+                      "bounce_count": 12,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 6
+                    }
+                  },
+                  {
+                    "id": 90032,
+                    "variant_label": "B",
+                    "is_baseline": false,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 1010,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 41,
+                      "reply_percentage": 4.06,
+                      "bounce_count": 75,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 7.4,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 20
+                    }
+                  }
+                ],
+                "linkedin_stats": null,
+                "manual_step_stats": null
+              }
+            ]
+          }
+        }
+      },
+      {
+        "json": {
+          "ok": true,
+          "data": {
+            "campaign_id": 12350,
+            "sequences": [
+              {
+                "id": 50051,
+                "email_campaign_seq_id": 50051,
+                "seq_number": 1,
+                "seq_type": "EMAIL",
+                "seq_schedule_type": "IMMEDIATE",
+                "subject_line": "Short note",
+                "seq_title": null,
+                "total_stats": {
+                  "sent_count": 4000,
+                  "reply_count": 15,
+                  "bounce_count": 48,
+                  "positive_reply_count": 7,
+                  "reply_percentage": 0.38
+                },
+                "engagement_level": "medium",
+                "variants": [
+                  {
+                    "id": 90051,
+                    "variant_label": "A",
+                    "is_baseline": true,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 2000,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 1,
+                      "reply_percentage": 0.05,
+                      "bounce_count": 24,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 0
+                    }
+                  },
+                  {
+                    "id": 90052,
+                    "variant_label": "B",
+                    "is_baseline": false,
+                    "created_at": "2026-10-01T09:00:00.000Z",
+                    "change_description": null,
+                    "stats": {
+                      "sent_count": 2000,
+                      "open_count": 0,
+                      "open_percentage": 0,
+                      "click_count": 0,
+                      "click_percentage": 0,
+                      "reply_count": 14,
+                      "reply_percentage": 0.7,
+                      "bounce_count": 24,
+                      "sender_bounce_count": 0,
+                      "bounce_percentage": 1.2,
+                      "unsubscribed_count": 1,
+                      "positive_reply_count": 7
+                    }
+                  }
+                ],
+                "linkedin_stats": null,
+                "manual_step_stats": null
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "Smartlead: Get Sequences": [
+      {
+        "json": {
+          "success": true,
+          "data": [
+            {
+              "id": 50001,
+              "created_at": "2026-10-01T09:00:00Z",
+              "updated_at": "2026-10-01T09:00:00Z",
+              "email_campaign_id": 12345,
+              "seq_number": 1,
+              "subject": "Quick question about {{company_name}}",
+              "follow_up_subject": null,
+              "email_body": "<p>Synthetic step 1 body for campaign 12345.</p>",
+              "seq_delay_details": {
+                "delayInDays": 0
+              },
+              "sequence_variants": [
+                {
+                  "id": 90001,
+                  "variant_name": "Variant A",
+                  "subject": "Quick question about {{company_name}}",
+                  "email_body": "<p>Synthetic step 1 variant A body.</p>"
+                },
+                {
+                  "id": 90002,
+                  "variant_name": "Variant B",
+                  "subject": "Quick question about {{company_name}}",
+                  "email_body": "<p>Synthetic step 1 variant B body.</p>"
+                }
+              ]
+            },
+            {
+              "id": 50002,
+              "created_at": "2026-10-01T09:00:00Z",
+              "updated_at": "2026-10-01T09:00:00Z",
+              "email_campaign_id": 12345,
+              "seq_number": 2,
+              "subject": "",
+              "follow_up_subject": null,
+              "email_body": "<p>Synthetic step 2 body for campaign 12345.</p>",
+              "seq_delay_details": {
+                "delayInDays": 3
+              },
+              "sequence_variants": [
+                {
+                  "id": 90003,
+                  "variant_name": "Variant A",
+                  "subject": "",
+                  "email_body": "<p>Synthetic step 2 variant A body.</p>",
+                  "variant_distribution_percentage": 50
+                },
+                {
+                  "id": 90004,
+                  "variant_name": "Variant B",
+                  "subject": "",
+                  "email_body": "<p>Synthetic step 2 variant B body.</p>",
+                  "variant_distribution_percentage": 50
+                }
+              ]
+            },
+            {
+              "id": 50003,
+              "created_at": "2026-10-01T09:00:00Z",
+              "updated_at": "2026-10-01T09:00:00Z",
+              "email_campaign_id": 12345,
+              "seq_number": 3,
+              "subject": "",
+              "follow_up_subject": null,
+              "email_body": "<p>Synthetic step 3 body for campaign 12345.</p>",
+              "seq_delay_details": {
+                "delayInDays": 5
+              },
+              "sequence_variants": []
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "success": true,
+          "data": [
+            {
+              "id": 50011,
+              "created_at": "2026-10-01T09:00:00Z",
+              "updated_at": "2026-10-01T09:00:00Z",
+              "email_campaign_id": 12346,
+              "seq_number": 1,
+              "subject": "{{first_name}}, idea for {{company_name}}",
+              "follow_up_subject": null,
+              "email_body": "<p>Synthetic step 1 body for campaign 12346.</p>",
+              "seq_delay_details": {
+                "delayInDays": 0
+              },
+              "sequence_variants": [
+                {
+                  "id": 90011,
+                  "variant_name": "Variant A",
+                  "subject": "{{first_name}}, idea for {{company_name}}",
+                  "email_body": "<p>Synthetic step 1 variant A body.</p>"
+                },
+                {
+                  "id": 90012,
+                  "variant_name": "Variant B",
+                  "subject": "{{first_name}}, idea for {{company_name}}",
+                  "email_body": "<p>Synthetic step 1 variant B body.</p>"
+                },
+                {
+                  "id": 90013,
+                  "variant_name": "Variant C",
+                  "subject": "{{first_name}}, idea for {{company_name}}",
+                  "email_body": "<p>Synthetic step 1 variant C body.</p>"
+                }
+              ]
+            },
+            {
+              "id": 50012,
+              "created_at": "2026-10-01T09:00:00Z",
+              "updated_at": "2026-10-01T09:00:00Z",
+              "email_campaign_id": 12346,
+              "seq_number": 2,
+              "subject": "",
+              "follow_up_subject": null,
+              "email_body": "<p>Synthetic step 2 body for campaign 12346.</p>",
+              "seq_delay_details": {
+                "delayInDays": 4
+              },
+              "sequence_variants": []
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "success": true,
+          "data": [
+            {
+              "id": 50021,
+              "created_at": "2026-10-01T09:00:00Z",
+              "updated_at": "2026-10-01T09:00:00Z",
+              "email_campaign_id": 12347,
+              "seq_number": 1,
+              "subject": "Worth a look?",
+              "follow_up_subject": null,
+              "email_body": "<p>Synthetic step 1 body for campaign 12347.</p>",
+              "seq_delay_details": {
+                "delayInDays": 0
+              },
+              "sequence_variants": [
+                {
+                  "id": 90021,
+                  "variant_name": "Variant A",
+                  "subject": "Worth a look?",
+                  "email_body": "<p>Synthetic step 1 variant A body.</p>"
+                },
+                {
+                  "id": 90022,
+                  "variant_name": "Variant B",
+                  "subject": "Worth a look?",
+                  "email_body": "<p>Synthetic step 1 variant B body.</p>"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "success": true,
+          "data": [
+            {
+              "id": 50031,
+              "created_at": "2026-10-01T09:00:00Z",
+              "updated_at": "2026-10-01T09:00:00Z",
+              "email_campaign_id": 12348,
+              "seq_number": 1,
+              "subject": "Saw your team is hiring",
+              "follow_up_subject": null,
+              "email_body": "<p>Synthetic step 1 body for campaign 12348.</p>",
+              "seq_delay_details": {
+                "delayInDays": 0
+              },
+              "sequence_variants": [
+                {
+                  "id": 90031,
+                  "variant_name": "Variant A",
+                  "subject": "Saw your team is hiring",
+                  "email_body": "<p>Synthetic step 1 variant A body.</p>"
+                },
+                {
+                  "id": 90032,
+                  "variant_name": "Variant B",
+                  "subject": "Saw your team is hiring",
+                  "email_body": "<p>Synthetic step 1 variant B body.</p>"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "success": true,
+          "data": [
+            {
+              "id": 50051,
+              "created_at": "2026-10-01T09:00:00Z",
+              "updated_at": "2026-10-01T09:00:00Z",
+              "email_campaign_id": 12350,
+              "seq_number": 1,
+              "subject": "Short note",
+              "follow_up_subject": null,
+              "email_body": "<p>Synthetic step 1 body for campaign 12350.</p>",
+              "seq_delay_details": {
+                "delayInDays": 0
+              },
+              "sequence_variants": [
+                {
+                  "id": 90051,
+                  "variant_name": "Variant A",
+                  "subject": "Short note",
+                  "email_body": "<p>Synthetic step 1 variant A body.</p>"
+                },
+                {
+                  "id": 90052,
+                  "variant_name": "Variant B",
+                  "subject": "Short note",
+                  "email_body": "<p>Synthetic step 1 variant B body.</p>"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "Smartlead: Pause Campaign": [
+      {
+        "json": {
+          "success": true,
+          "message": "Campaign status updated successfully",
+          "campaign": {
+            "id": 12345,
+            "status": "PAUSED"
+          }
+        }
+      },
+      {
+        "json": {
+          "success": true,
+          "message": "Campaign status updated successfully",
+          "campaign": {
+            "id": 12346,
+            "status": "PAUSED"
+          }
+        }
+      }
+    ],
+    "Smartlead: Save Sequence Split": [
+      {
+        "json": {
+          "ok": true,
+          "data": [
+            {
+              "id": 50001,
+              "seq_number": 1
+            },
+            {
+              "id": 50002,
+              "seq_number": 2
+            },
+            {
+              "id": 50003,
+              "seq_number": 3
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "ok": true,
+          "data": [
+            {
+              "id": 50011,
+              "seq_number": 1
+            },
+            {
+              "id": 50012,
+              "seq_number": 2
+            }
+          ]
+        }
+      }
+    ],
+    "Smartlead: Resume Campaign": [
+      {
+        "json": {
+          "success": true,
+          "message": "Campaign status updated successfully",
+          "campaign": {
+            "id": 12345,
+            "status": "ACTIVE"
+          }
+        }
+      },
+      {
+        "json": {
+          "success": true,
+          "message": "Campaign status updated successfully",
+          "campaign": {
+            "id": 12346,
+            "status": "ACTIVE"
+          }
+        }
+      }
+    ],
+    "Slack: Post Summary": [
+      {
+        "json": {
+          "data": "ok"
+        }
+      }
+    ],
+    "Webhook: Post Summary": [
+      {
+        "json": {
+          "received": true
+        }
+      }
+    ]
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": 1800
+  },
+  "versionId": "8cc1e6e3-7ea2-50d4-afe3-7a1e3da02729",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
