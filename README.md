@@ -61,6 +61,8 @@ I built this workflow to close tests on evidence. Every day it reads per-variant
 
 ## 2. Architecture and Data Flow
 
+![Smartlead Campaign A/B Test Winner Auto-Promoter Architecture](workflow-overview.png)
+
 ```mermaid
 flowchart LR
     SCH[Daily A/B Evaluation<br/>07:15 UTC] --> CFG
